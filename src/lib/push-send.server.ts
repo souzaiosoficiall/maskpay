@@ -96,12 +96,21 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   return summary;
 }
 
+function formatBRL(amount: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(Number(amount) || 0);
+}
+
 /**
  * Notifies the wallet owner that a PIX deposit was confirmed.
- * Safe to call for any transaction; callers are responsible for only
- * invoking this once per confirmed transaction (see payment-webhook.ts).
+ * Style similar to bank apps: title + amount + origin.
  */
-export async function notifyPixDepositConfirmed(walletId: string): Promise<SendPushSummary | null> {
+export async function notifyPixDepositConfirmed(
+  walletId: string,
+  opts?: { amount?: number; origin?: string | null },
+): Promise<SendPushSummary | null> {
   try {
     const { data: wallet, error } = await (supabaseAdmin as any)
       .from("wallets")
@@ -114,12 +123,25 @@ export async function notifyPixDepositConfirmed(walletId: string): Promise<SendP
       return null;
     }
 
+    const amount = opts?.amount != null ? Number(opts.amount) : null;
+    const origin = (opts?.origin || "").trim() || "PIX";
+
+    const body =
+      amount != null && !Number.isNaN(amount)
+        ? `Você recebeu ${formatBRL(amount)} de ${origin}.`
+        : `Você recebeu um pagamento via ${origin}.`;
+
     return await sendPushToUser(wallet.user_id, {
-      title: "MaskPay",
-      body: "PIX RECEBIDO! OLHE SEU SALDO",
+      title: "MaskPay | Pagamento recebido",
+      body,
       url: "/dashboard",
       tag: "pix-deposit",
-      data: { type: "pix_deposit", walletId },
+      data: {
+        type: "pix_deposit",
+        walletId,
+        amount: amount ?? undefined,
+        origin,
+      },
     });
   } catch (err) {
     console.error("[push] Unexpected error in notifyPixDepositConfirmed:", err);

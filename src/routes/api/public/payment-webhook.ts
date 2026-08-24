@@ -97,7 +97,18 @@ export const Route = createFileRoute('/api/public/payment-webhook')({
 
                 try {
                   const { notifyPixDepositConfirmed } = await import('@/lib/push-send.server');
-                  await notifyPixDepositConfirmed((existingTx as any).wallet_id);
+                  const origin =
+                    payload?.payerName ||
+                    payload?.payer_name ||
+                    payload?.customer?.name ||
+                    payload?.endToEndId ||
+                    payload?.end_to_end_id ||
+                    (existingTx as any)?.description ||
+                    'PIX';
+                  await notifyPixDepositConfirmed((existingTx as any).wallet_id, {
+                    amount: Number((existingTx as any).amount),
+                    origin: String(origin),
+                  });
                   await (supabaseAdmin
                     .from('transactions')
                     .update({ push_notified_at: new Date().toISOString() } as any) as any)
