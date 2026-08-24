@@ -59,7 +59,7 @@ export default function DashboardLayout() {
 
   const SidebarContent = ({ isMobile = false }) => (
     <div className="flex flex-col h-full bg-card">
-      <div className="h-16 flex items-center px-6 border-b border-white/5 shrink-0">
+      <div className="h-16 flex items-center px-6 border-b border-white/5 shrink-0 pt-[env(safe-area-inset-top)]" style={{ minHeight: "calc(4rem + env(safe-area-inset-top, 0px))" }}>
         <Link to="/" className="flex items-center gap-3 overflow-hidden">
           <img src={maskPlatformAsset.url} alt="MaskPay" className={cn("object-contain transition-all", (isSidebarOpen || isMobile) ? "w-8 h-8 min-w-8" : "w-6 h-6 min-w-6")} />
           {(isSidebarOpen || isMobile) && (
@@ -226,7 +226,7 @@ export default function DashboardLayout() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        <header className="h-16 bg-card/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 sticky top-0 z-40 shrink-0">
+        <header className="h-16 pt-[env(safe-area-inset-top)] bg-card/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 shrink-0" style={{ height: "calc(4rem + env(safe-area-inset-top, 0px))" }}>
           <div className="flex items-center gap-4">
             {/* Desktop Toggle */}
             <Button 
@@ -249,7 +249,7 @@ export default function DashboardLayout() {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-72 border-white/5 bg-card">
+              <SheetContent side="left" className="p-0 w-72 border-white/5 bg-card pt-[env(safe-area-inset-top)]">
                 <SidebarContent isMobile />
               </SheetContent>
             </Sheet>

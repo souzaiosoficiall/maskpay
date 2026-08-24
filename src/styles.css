@@ -114,15 +114,6 @@
   animation: marquee 20s linear infinite;
 }
 
-/* PWA standalone mode: respeita a safe-area em iOS/Android (notch, home indicator) */
-@media all and (display-mode: standalone) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-}
 
 
 @layer base {
@@ -172,3 +163,30 @@ html.layout-compact .text-3xl { font-size: 1.35rem !important; }
   .rounded-\[2rem\], .rounded-\[2\.5rem\] { border-radius: 1.1rem !important; }
 }
 
+
+/* PWA standalone: safe-area. Top fica no header (não no body) pra não criar "buraco" branco sob o Dynamic Island */
+html, body {
+  background-color: #000;
+}
+@media (display-mode: standalone) {
+  body {
+    padding-top: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+/* Garante fundo preto atrás do status bar / notch */
+@supports (padding: env(safe-area-inset-top)) {
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    background: #000;
+    z-index: 9999;
+    pointer-events: none;
+  }
+}
