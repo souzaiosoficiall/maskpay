@@ -27,6 +27,18 @@ function AuthPage() {
   const search = Route.useSearch();
   const mode = search['mode'];
   const isLogin = mode === 'login';
+
+  // Already logged in → skip login screen (session restored from localStorage)
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session?.access_token) {
+        window.location.href = '/dashboard';
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
   const [step, setStep] = useState(1);
   const [accountType, setAccountType] = useState<'PF' | 'PJ'>('PF');
   const [fullName, setFullName] = useState('');

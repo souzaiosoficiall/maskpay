@@ -27,26 +27,31 @@ function AuthenticatedLayout() {
 
   useEffect(() => {
     if (!sessionReady) return;
-    
-    // Update server-side access time
-    doUpdateLastAccess({});
-    
-    // Update client-side local session expiry logic
-    const lastLogin = window.localStorage.getItem('maskpay-login-timestamp');
-    const now = Date.now();
-    const twentyFourHours = 24 * 60 * 60 * 1000;
 
-    if (lastLogin && (now - parseInt(lastLogin)) > twentyFourHours) {
-      console.log("[AuthenticatedLayout] Session expired (>24h). Logging out.");
-      supabase.auth.signOut().then(() => {
-        window.localStorage.removeItem('maskpay-login-timestamp');
-        window.location.href = '/auth?mode=login';
-      });
-      return;
-    }
+    // Confirm session still exists in storage (do not force logout just because profile is slow)
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      doUpdateLastAccess({}).catch(() => undefined);
 
-    // Update the timestamp on every active access
-    window.localStorage.setItem('maskpay-login-timestamp', now.toString());
+      const lastAccess = window.localStorage.getItem('maskpay-login-timestamp');
+      const now = Date.now();
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+
+      // Only expire after 24h WITHOUT opening the app
+      if (lastAccess) {
+        const elapsed = now - parseInt(lastAccess, 10);
+        if (!Number.isNaN(elapsed) && elapsed > twentyFourHours) {
+          console.log('[AuthenticatedLayout] Session expired (>24h inactivity).');
+          supabase.auth.signOut().then(() => {
+            window.localStorage.removeItem('maskpay-login-timestamp');
+            window.location.href = '/auth?mode=login';
+          });
+          return;
+        }
+      }
+
+      window.localStorage.setItem('maskpay-login-timestamp', String(now));
+    });
   }, [sessionReady, location.pathname, doUpdateLastAccess]);
 
   useEffect(() => {
@@ -67,7 +72,7 @@ function AuthenticatedLayout() {
       const isPending = profile.verification_status === 'pending' || profile.verification_status === 'pending_review';
       
       // Permitir acesso APENAS a rotas essenciais se não estiver verificado
-      const allowedPaths = ['/dashboard', '/support', '/verify', '/settings'];
+      const allowedPaths = ['/dashboard', '/support', '/verify'];
       const currentPath = location.pathname;
       
       const isAllowed = allowedPaths.some(path => currentPath === path || currentPath.startsWith(path + '/'));

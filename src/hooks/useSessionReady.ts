@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Returns true once the Supabase session has been restored in the browser.
- * Server functions protected by requireSupabaseAuth must only be called
- * after this is true, otherwise no bearer token is attached.
+ * True once a persisted session with access_token has been restored.
+ * False while restoring or when logged out.
  */
 export function useSessionReady() {
   const [ready, setReady] = useState(false);
@@ -13,14 +12,39 @@ export function useSessionReady() {
     let mounted = true;
 
     supabase.auth.getSession().then(({ data }) => {
-      if (mounted && data.session?.access_token) {
-        setReady(true);
+      if (!mounted) return;
+      const has = !!data.session?.access_token;
+      setReady(has);
+      if (has) {
+        try {
+          if (!window.localStorage.getItem('maskpay-login-timestamp')) {
+            window.localStorage.setItem('maskpay-login-timestamp', String(Date.now()));
+          }
+        } catch {
+          // ignore
+        }
       }
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) {
-        setReady(!!session?.access_token);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      const has = !!session?.access_token;
+      setReady(has);
+
+      if (has && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+        try {
+          window.localStorage.setItem('maskpay-login-timestamp', String(Date.now()));
+        } catch {
+          // ignore
+        }
+      }
+
+      if (event === 'SIGNED_OUT') {
+        try {
+          window.localStorage.removeItem('maskpay-login-timestamp');
+        } catch {
+          // ignore
+        }
       }
     });
 
