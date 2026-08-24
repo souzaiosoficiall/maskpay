@@ -50,11 +50,29 @@ export const getProfile = createServerFn({ method: "GET" })
       return isAdmin ? 'admin' : 'user';
     };
 
-    let { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
-      .eq('id', userId)
-      .maybeSingle();
+    // Prefer service role so RLS never hides the row from the owner
+    let data: any = null;
+    let error: any = null;
+    try {
+      const adminRes = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
+        .eq('id', userId)
+        .maybeSingle();
+      data = adminRes.data;
+      error = adminRes.error;
+    } catch (e) {
+      error = e;
+    }
+    if (!data) {
+      const userRes = await supabase
+        .from('profiles')
+        .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
+        .eq('id', userId)
+        .maybeSingle();
+      if (userRes.data) data = userRes.data;
+      if (!error) error = userRes.error;
+    }
 
     // IMPORTANT: Use the full_name from the profile, don't force fallbacks like "PROPRIETÁRIO"
     const role = await fetchRole();
@@ -74,7 +92,13 @@ export const getProfile = createServerFn({ method: "GET" })
 
     // Force sync from Auth metadata if the record exists but fields are null
     if (data) {
-      const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+      let authUser: any = null;
+      try {
+        const res = await supabaseAdmin.auth.admin.getUserById(userId);
+        authUser = res?.data?.user ?? null;
+      } catch (e) {
+        console.error('[getProfile] getUserById failed:', e);
+      }
       if (authUser?.user_metadata) {
         const meta = authUser.user_metadata;
         const updates: any = {};
@@ -99,7 +123,8 @@ export const getProfile = createServerFn({ method: "GET" })
 
     if (error) {
        console.error("Profile fetch error:", error);
-       throw new Error(error.message);
+       // Do not throw — fall through to admin create / in-memory profile
+       data = null as any;
     }
 
     if (data) {
@@ -107,7 +132,13 @@ export const getProfile = createServerFn({ method: "GET" })
     }
 
     // Profile row doesn't exist yet — create it using admin client to bypass RLS
-    const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+    let authUser: any = null;
+    try {
+      const res = await supabaseAdmin.auth.admin.getUserById(userId);
+      authUser = res?.data?.user ?? null;
+    } catch (e) {
+      console.error('[getProfile] getUserById (create path) failed:', e);
+    }
     const userMetadata = authUser?.user_metadata || {};
     
     // Use the name from metadata (filled during sign up)

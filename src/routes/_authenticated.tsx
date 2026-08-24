@@ -67,7 +67,7 @@ function AuthenticatedLayout() {
       const isPending = profile.verification_status === 'pending' || profile.verification_status === 'pending_review';
       
       // Permitir acesso APENAS a rotas essenciais se não estiver verificado
-      const allowedPaths = ['/dashboard', '/support', '/verify'];
+      const allowedPaths = ['/dashboard', '/support', '/verify', '/settings'];
       const currentPath = location.pathname;
       
       const isAllowed = allowedPaths.some(path => currentPath === path || currentPath.startsWith(path + '/'));

@@ -145,7 +145,6 @@ function RootComponent() {
       <Toaster
         position="bottom-center"
         offset={24}
-        mobileOffset={{ bottom: 28 }}
         visibleToasts={3}
         richColors
         closeButton
