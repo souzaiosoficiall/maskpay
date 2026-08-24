@@ -155,18 +155,21 @@ export default function AdminLayout() {
   const fetchProfile = useServerFn(getProfile);
   const fetchTickets = useServerFn(getTickets);
   const fetchUsers = useServerFn(getAllUsers);
+  const [isAdminForce, setIsAdminForce] = useState<boolean | null>(null);
 
   // Define as as content routes under /admin use this layout, we can safely use useSearch
   const search = useSearch({ from: '/admin' }) as any;
 
   const isLoginPage = location.pathname.includes('/admin/login');
-  const ADMIN_EMAIL = 'souzaiosoficial@gmail.com';
+  const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
+  const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
 
   const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      const isOwner = session?.user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      const userEmail = session?.user?.email?.toLowerCase().trim();
+      const isOwner = userEmail === cleanOwnerEmail;
 
       try {
         const result = await fetchProfile({});
@@ -186,26 +189,24 @@ export default function AdminLayout() {
         throw err;
       }
     },
-    enabled: sessionReady,
+    enabled: sessionReady && isAdminForce === true,
     staleTime: 60000,
   });
 
   const { data: tickets = [] } = useQuery({
     queryKey: ['admin_tickets'],
     queryFn: () => fetchTickets({}).catch(() => []),
-    enabled: sessionReady && !!profile,
+    enabled: sessionReady && isAdminForce === true && !!profile,
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ['admin_users'],
     queryFn: () => fetchUsers({}).catch(() => []),
-    enabled: sessionReady && !!profile,
+    enabled: sessionReady && isAdminForce === true && !!profile,
   });
 
   const hasOpenTickets = tickets.some((t: any) => t.status === 'Aberto');
   const hasPendingKyc = users.some((u: any) => u.kyc_status === 'pending' || u.verification_status === 'pending_review');
-
-  const [isAdminForce, setIsAdminForce] = useState<boolean | null>(null);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -229,11 +230,21 @@ export default function AdminLayout() {
 
       console.log("AdminLayout: Buscando sessão Supabase...");
       const { data: { session } } = await supabase.auth.getSession();
+      const userEmail = session?.user?.email?.toLowerCase().trim();
+      const isOwner = userEmail === cleanOwnerEmail;
       
       if (!session?.user) {
         console.log("AdminLayout: Nenhuma sessão encontrada");
         setIsAdminForce(false);
-        window.location.assign('/admin/login');
+        if (!window.location.pathname.includes('/admin/login')) {
+          window.location.href = '/admin/login';
+        }
+        return;
+      }
+
+      if (isOwner) {
+        console.log("AdminLayout: Proprietário detectado, pulando verificação de role");
+        setIsAdminForce(true);
         return;
       }
 
@@ -244,19 +255,19 @@ export default function AdminLayout() {
           console.log("AdminLayout: Usuário logado mas não é admin");
           await supabase.auth.signOut();
           setIsAdminForce(false);
-          window.location.assign('/admin/login');
+          window.location.href = '/admin/login';
         } else {
           setIsAdminForce(true);
         }
       } catch (error) {
         console.error("Erro ao verificar role admin:", error);
         // Em caso de erro de rede, se for o owner, permitimos o carregamento
-        const isOwner = session.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        const isOwner = session.user.email?.toLowerCase().trim() === cleanOwnerEmail;
         if (isOwner) {
           setIsAdminForce(true);
         } else {
           setIsAdminForce(false);
-          window.location.assign('/admin/login');
+          window.location.href = '/admin/login';
         }
       }
     };

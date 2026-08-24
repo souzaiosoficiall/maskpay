@@ -118,40 +118,49 @@ function DashboardPage() {
     ];
   }, [txStats, wallet?.balance]);
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Bom dia';
+    if (hour >= 12 && hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  }, []);
+
+  const firstName = profile?.full_name?.split(' ')[0] || '';
+
   return (
     <div className="space-y-6 md:space-y-10 pb-16 font-sans relative z-10 w-full overflow-hidden">
-      {profile?.verification_status === 'unverified' && (
-        <Card className="border-red-500/20 bg-red-500/5 rounded-[2rem] overflow-hidden border-2 transition-all duration-300">
+      <div className="animate-in fade-in slide-in-from-left duration-700">
+        <h2 className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-primary mb-2">
+          {greeting}, {firstName}!
+        </h2>
+      </div>
+
+      {isLoadingProfile && !profile && (
+        <Card className="border-white/5 bg-white/5 rounded-[2rem] overflow-hidden border-2 animate-pulse">
+          <CardContent className="p-6 h-24 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground/20" />
+          </CardContent>
+        </Card>
+      )}
+
+      {(profile?.verification_status === 'unverified' || !profile?.verification_status) && profile?.role !== 'admin' && (
+        <Card className="border-red-500/20 bg-red-500/10 rounded-[2rem] overflow-hidden border-2 shadow-lg shadow-red-500/5">
           <CardContent className="p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-5 md:gap-6">
             <div className="flex items-center gap-4 w-full md:w-auto">
               <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shrink-0">
                 <Fingerprint className="w-5 h-5 md:w-6 md:h-6 text-red-500" />
               </div>
               <div>
-                <h3 className="text-xs md:text-sm font-black uppercase tracking-tighter text-white">Verificação necessária</h3>
-                <p className="text-[9px] md:text-[10px] font-bold text-red-500/60 uppercase tracking-widest mt-0.5 md:mt-1 leading-relaxed">Sua conta ainda não foi verificada. Algumas funcionalidades estão bloqueadas.</p>
+                <h3 className="text-xs md:text-sm font-black uppercase tracking-tighter text-white">Verificação pendente</h3>
+                <p className="text-[9px] md:text-[10px] font-bold text-red-500/60 uppercase tracking-widest mt-0.5 md:mt-1 leading-relaxed">Você ainda não realizou sua verificação de identidade. Envie seus documentos agora para liberar todas as funcionalidades da plataforma.</p>
               </div>
             </div>
             <Button 
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log("Forcing navigation to /verify...");
-                window.location.href = '/verify';
-              }}
-              className="w-full md:w-auto bg-red-500 hover:bg-red-600 text-white rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest px-8 py-5 md:py-6 h-auto"
+              onClick={() => navigate({ to: '/verify' })}
+              className="bg-red-500 text-white hover:bg-red-600 rounded-xl px-6 py-2 text-[8px] font-black uppercase tracking-widest shrink-0"
             >
-              Iniciar verificação
+              Começar Verificação
             </Button>
-          </CardContent>
-        </Card>
-      )}
-
-
-      {isLoadingProfile && !profile && (
-        <Card className="border-white/5 bg-white/5 rounded-[2rem] overflow-hidden border-2 animate-pulse">
-          <CardContent className="p-6 h-24 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground/20" />
           </CardContent>
         </Card>
       )}

@@ -132,12 +132,28 @@ export const getAllNotifications = createServerFn({ method: "GET" })
 
     const { data, error } = await (supabase as any)
       .from("notifications")
-      .select(`
-        *,
-        profiles (full_name)
-      `)
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    const notifications = data || [];
+    if (!notifications.length) return [];
+
+    const creatorIds = Array.from(
+      new Set(notifications.map((n: any) => n.created_by).filter(Boolean))
+    );
+
+    let byId = new Map<string, any>();
+    if (creatorIds.length) {
+      const { data: profiles } = await (supabase as any)
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", creatorIds);
+      byId = new Map((profiles || []).map((p: any) => [p.id, p]));
+    }
+
+    return notifications.map((n: any) => ({
+      ...n,
+      profiles: n.created_by ? byId.get(n.created_by) ?? null : null,
+    }));
   });

@@ -113,22 +113,41 @@ export const requireAdminRole = createMiddleware({ type: 'function' })
   .server(async ({ next, context }) => {
     const { supabase, userId, claims } = context;
     const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
+    const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
     
-    // Bypass para o dono
-    if (claims?.email?.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+    const userEmail = claims?.email?.toLowerCase().trim();
+    const isOwner = userEmail === cleanOwnerEmail;
+    
+    if (isOwner) {
       return next();
     }
 
-    // Verifica se o usuário tem a role 'admin'
-    const { data: isAdmin, error } = await supabase.rpc('has_role', {
+    // Verifica se o usuário tem a role 'admin' (via RPC, com fallback na tabela)
+    let isAdmin = false;
+
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('has_role', {
       _user_id: userId,
       _role: 'admin',
     });
 
-    if (error || !isAdmin) {
+    if (!rpcError) {
+      isAdmin = rpcResult === true;
+    } else {
+      // RPC pode não existir neste banco: tenta ler a tabela de roles diretamente
+      const { data: roleRow } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .maybeSingle();
+      isAdmin = !!roleRow;
+    }
+
+    if (!isAdmin) {
       console.error(`[requireAdminRole] Acesso negado para o usuário ${userId} (${claims?.email})`);
       throw new Error('Unauthorized: Acesso restrito a administradores');
     }
+
 
     return next();
   });

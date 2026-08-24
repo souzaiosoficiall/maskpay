@@ -7,22 +7,36 @@ import { OWNER_EMAIL } from "./admin-auth.constants";
 const ensureAdmin = async (context: any) => {
   if (!context) throw new Error("Acesso negado: Contexto inválido.");
   
-  // PRIMARY SECURITY: Owner email bypasses any further DB checks
-  if (context.claims?.email?.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+  const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
+  const userEmail = context.claims?.email?.toLowerCase().trim();
+  
+  if (userEmail === cleanOwnerEmail) {
     return context;
   }
 
-  // SECONDARY SECURITY: Check role for other users
   if (context.supabase) {
-    const { data: isAdmin } = await context.supabase.rpc('has_role', { 
+    let isAdmin = false;
+    const { data: rpcResult, error: rpcError } = await context.supabase.rpc('has_role', { 
       _user_id: context.userId, 
       _role: 'admin' 
     });
     
+    if (!rpcError) {
+      isAdmin = rpcResult === true;
+    } else {
+      const { data: roleRow } = await context.supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', context.userId)
+        .eq('role', 'admin')
+        .maybeSingle();
+      isAdmin = !!roleRow;
+    }
+    
     if (isAdmin) return context;
   }
   
-  throw new Error("Não autorizado: Acesso restrito ao administrador proprietário.");
+  throw new Error("Não autorizado: Acesso restrito.");
 };
 
 export const getAllUsers = createServerFn({ method: "GET" })
@@ -31,16 +45,38 @@ export const getAllUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }: { context: any }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await ensureAdmin(context);
+    
+    const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+    if (authError) {
+      console.error("Erro ao buscar usuários do Auth:", authError);
+      return [];
+    }
 
-    const { data, error } = await supabaseAdmin
+    const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Erro ao buscar perfis:", error);
-      return [];
-    }
+    const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+    const data = (authUsers.users || []).map(user => {
+      const p = profilesMap.get(user.id);
+      return {
+        id: user.id,
+        email: p?.email || user.email || 'N/A',
+        full_name: p?.full_name || user.user_metadata?.['full_name'] || user.user_metadata?.['name'] || 'Usuário sem Nome',
+        document: p?.document || user.user_metadata?.['document'] || null,
+        phone: p?.phone || user.user_metadata?.['phone'] || null,
+        status: p?.status || 'active',
+        verification_status: p?.verification_status || 'unverified',
+        kyc_status: p?.kyc_status || 'unverified',
+        account_route: p?.account_route || 'WHITE',
+        created_at: p?.created_at || user.created_at
+      };
+    });
+
+    // Sort by created_at descending
+    data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     const { data: wallets } = await supabaseAdmin
       .from('wallets')

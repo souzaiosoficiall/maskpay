@@ -1,25 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { requireSupabaseAuth, requireAdminRole } from "@/integrations/supabase/auth-middleware";
-
-const ticketSubjectSchema = z.enum(['Conta', 'Financeiro', 'Sugestão']);
-const ticketStatusSchema = z.enum(['Aberto', 'Resolvido']);
+import {
+  createTicketSchema,
+  listTicketsSchema,
+  sendTicketMessageSchema,
+  ticketIdSchema,
+} from "@/lib/support.schemas";
 
 export const createTicket = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
-
-    z.object({
-      subject: ticketSubjectSchema,
-      message: z.string().min(1),
-      attachmentUrl: z.string().optional(),
-    }).parse(data)
-  )
+  .validator((data: unknown) => createTicketSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
     const isBypass = claims?.['access_token'] === 'admin-bypass-token';
-    const ADMIN_EMAIL = 'souzaiosoficial@gmail.com';
-    const isAdmin = claims?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() || isBypass;
+    const cleanOwnerEmail = 'souzaiosoficial@gmail.com';
+    const isAdmin = claims?.email?.toLowerCase().trim() === cleanOwnerEmail || isBypass;
     
     let db = supabase;
     if (isAdmin) {
@@ -69,10 +64,7 @@ export const createTicket = createServerFn({ method: "POST" })
 
 export const getTickets = createServerFn({ method: "POST" })
   .middleware([requireAdminRole])
-  .validator((data: unknown) =>
-
-    z.object({ status: ticketStatusSchema.optional() }).optional().parse(data ?? {})
-  )
+  .validator((data: unknown) => listTicketsSchema.parse(data ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase, claims, userId } = context;
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
@@ -100,28 +92,40 @@ export const getTickets = createServerFn({ method: "POST" })
 
 export const getTicketMessages = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => z.string().uuid().parse(data))
+  .validator((data: unknown) => ticketIdSchema.parse(data))
 
   .handler(async ({ data: ticketId, context }) => {
     const { supabase, userId, claims } = context;
     const isBypass = claims?.['access_token'] === 'admin-bypass-token';
-    const ADMIN_EMAIL = 'souzaiosoficial@gmail.com';
+    const cleanOwnerEmail = 'souzaiosoficial@gmail.com';
+    const userEmail = claims?.email?.toLowerCase().trim();
 
     // Use service client for internal resolution if admin, but always authorize
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     let db = supabase;
 
-    let isAdmin = claims?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() || isBypass;
+    let isAdmin = userEmail === cleanOwnerEmail || isBypass;
     if (isAdmin) {
       db = supabaseAdmin;
     } else {
-      const { data: hasRole } = await supabase.rpc('has_role', {
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('has_role', {
         _user_id: userId,
         _role: 'admin',
       });
-      if (hasRole) {
+      if (!rpcError && rpcResult) {
         isAdmin = true;
         db = supabaseAdmin;
+      } else if (rpcError) {
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('role', 'admin')
+          .maybeSingle();
+        if (roleRow) {
+          isAdmin = true;
+          db = supabaseAdmin;
+        }
       }
     }
 
@@ -149,29 +153,33 @@ export const getTicketMessages = createServerFn({ method: "POST" })
 
 export const sendTicketMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
-
-    z.object({
-      ticketId: z.string().uuid(),
-      content: z.string().min(1),
-      attachmentUrl: z.string().optional(),
-    }).parse(data)
-  )
+  .validator((data: unknown) => sendTicketMessageSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
     const isBypass = claims?.['access_token'] === 'admin-bypass-token';
-    const ADMIN_EMAIL = 'souzaiosoficial@gmail.com';
-    const isOwnerAdmin = claims?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() || isBypass;
+    const cleanOwnerEmail = 'souzaiosoficial@gmail.com';
+    const userEmail = claims?.email?.toLowerCase().trim();
+    const isOwnerAdmin = userEmail === cleanOwnerEmail || isBypass;
 
     let db = supabase;
     let isAdmin = isOwnerAdmin;
 
     if (!isAdmin) {
-      const { data: hasRole } = await supabase.rpc('has_role', {
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('has_role', {
         _user_id: userId,
         _role: 'admin',
       });
-      if (hasRole) isAdmin = true;
+      if (!rpcError && rpcResult) {
+        isAdmin = true;
+      } else if (rpcError) {
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('role', 'admin')
+          .maybeSingle();
+        if (roleRow) isAdmin = true;
+      }
     }
 
     if (isAdmin) {
@@ -194,21 +202,36 @@ export const sendTicketMessage = createServerFn({ method: "POST" })
 
 export const resolveTicket = createServerFn({ method: "POST" })
   .middleware([requireAdminRole])
-  .validator((data: unknown) => z.string().uuid().parse(data))
+  .validator((data: unknown) => ticketIdSchema.parse(data))
   .handler(async ({ data: ticketId, context }) => {
     const { userId, supabase, claims } = context;
     const isBypass = claims?.['access_token'] === 'admin-bypass-token';
-    const ADMIN_EMAIL = 'souzaiosoficial@gmail.com';
-    const isOwnerAdmin = claims?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() || isBypass;
+    const cleanOwnerEmail = 'souzaiosoficial@gmail.com';
+    const userEmail = claims?.email?.toLowerCase().trim();
+    const isOwnerAdmin = userEmail === cleanOwnerEmail || isBypass;
 
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     let db = supabase;
 
     // Check if user is admin
-    const { data: isAdmin } = await (isOwnerAdmin ? supabaseAdmin : supabase).rpc('has_role', {
-      _user_id: userId,
-      _role: 'admin'
-    });
+    let isAdmin = false;
+    if (!isOwnerAdmin) {
+      const { data: rpcResult, error: rpcError } = await (isOwnerAdmin ? supabaseAdmin : supabase).rpc('has_role', {
+        _user_id: userId,
+        _role: 'admin'
+      });
+      if (!rpcError && rpcResult) {
+        isAdmin = true;
+      } else if (rpcError) {
+        const { data: roleRow } = await (isOwnerAdmin ? supabaseAdmin : supabase)
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('role', 'admin')
+          .maybeSingle();
+        if (roleRow) isAdmin = true;
+      }
+    }
 
     if (isOwnerAdmin || isAdmin) {
       db = supabaseAdmin;

@@ -6,21 +6,34 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 export const getKycRequests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const ADMIN_EMAIL = 'souzaiosoficial@gmail.com';
-    const isOwner = context.claims?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const cleanOwnerEmail = 'souzaiosoficial@gmail.com';
+    const userEmail = context.claims?.email?.toLowerCase().trim();
+    const isOwner = userEmail === cleanOwnerEmail;
 
     if (!isOwner) {
-      const { data: isAdmin } = await context.supabase.rpc('has_role', { 
+      let isAdmin = false;
+      const { data: rpcResult, error: rpcError } = await context.supabase.rpc('has_role', { 
         _user_id: context.userId, 
         _role: 'admin' 
       });
+      if (!rpcError) {
+        isAdmin = rpcResult === true;
+      } else {
+        const { data: roleRow } = await context.supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', context.userId)
+          .eq('role', 'admin')
+          .maybeSingle();
+        isAdmin = !!roleRow;
+      }
       if (!isAdmin) throw new Error("Não autorizado: Acesso restrito.");
     }
 
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
-      .neq('email', ADMIN_EMAIL) // Don't show owner in moderation list
+      .neq('email', cleanOwnerEmail) // Don't show owner in moderation list
       .or('kyc_status.eq.pending,kyc_status.eq.pending_review,verification_status.eq.pending,verification_status.eq.pending_review,status.eq.pending_review')
       .order('created_at', { ascending: false });
 
@@ -38,14 +51,27 @@ export const updateKycStatus = createServerFn({ method: "POST" })
     }).parse(data)
   )
   .handler(async ({ data, context }) => {
-    const ADMIN_EMAIL = 'souzaiosoficial@gmail.com';
-    const isOwner = context.claims?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const cleanOwnerEmail = 'souzaiosoficial@gmail.com';
+    const userEmail = context.claims?.email?.toLowerCase().trim();
+    const isOwner = userEmail === cleanOwnerEmail;
 
     if (!isOwner) {
-      const { data: isAdmin } = await context.supabase.rpc('has_role', { 
+      let isAdmin = false;
+      const { data: rpcResult, error: rpcError } = await context.supabase.rpc('has_role', { 
         _user_id: context.userId, 
         _role: 'admin' 
       });
+      if (!rpcError) {
+        isAdmin = rpcResult === true;
+      } else {
+        const { data: roleRow } = await context.supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', context.userId)
+          .eq('role', 'admin')
+          .maybeSingle();
+        isAdmin = !!roleRow;
+      }
       if (!isAdmin) throw new Error("Não autorizado: Acesso restrito.");
     }
 
@@ -81,14 +107,27 @@ export const getKycRequestAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.string().uuid().parse(data))
   .handler(async ({ data: userId, context }) => {
-    const ADMIN_EMAIL = 'souzaiosoficial@gmail.com';
-    const isOwner = context.claims?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const cleanOwnerEmail = 'souzaiosoficial@gmail.com';
+    const userEmail = context.claims?.email?.toLowerCase().trim();
+    const isOwner = userEmail === cleanOwnerEmail;
 
     if (!isOwner) {
-      const { data: isAdmin } = await context.supabase.rpc('has_role', { 
+      let isAdmin = false;
+      const { data: rpcResult, error: rpcError } = await context.supabase.rpc('has_role', { 
         _user_id: context.userId, 
         _role: 'admin' 
       });
+      if (!rpcError) {
+        isAdmin = rpcResult === true;
+      } else {
+        const { data: roleRow } = await context.supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', context.userId)
+          .eq('role', 'admin')
+          .maybeSingle();
+        isAdmin = !!roleRow;
+      }
       if (!isAdmin) throw new Error("Não autorizado: Acesso restrito.");
     }
 

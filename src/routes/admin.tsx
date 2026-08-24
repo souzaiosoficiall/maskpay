@@ -6,10 +6,15 @@ export const Route = createFileRoute('/admin')({
   beforeLoad: async ({ location }) => {
     if (location.pathname === '/admin/login') return;
     
-    // No lado do cliente, verificamos se há um token básico no localStorage ou sessão
     if (typeof window !== 'undefined') {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
+      const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
+      const userEmail = session?.user?.email?.toLowerCase().trim();
+      const isOwner = userEmail === cleanOwnerEmail;
+
+      if (!session && !isOwner) {
+        console.log("AdminRoute: Sem sessão, redirecionando para login");
         throw redirect({ to: '/admin/login' });
       }
     }

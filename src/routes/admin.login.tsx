@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { adminLoginBypass } from '@/lib/admin-auth.functions';
+import { adminLoginBypass, checkAdminRole } from '@/lib/admin-auth.functions';
 import maskPlatformAsset from "@/lib/mask-asset";
 
 export const Route = createFileRoute('/admin/login')({
@@ -47,14 +47,23 @@ function AdminLoginPage() {
       });
 
       if (!signInError && signInData.session) {
-        console.log("Login padrão OK, guardando timestamp...");
+        const isAdmin = await checkAdminRole({
+          data: { userId: signInData.session.user.id },
+        });
+        if (!isAdmin) {
+          await supabase.auth.signOut();
+          throw new Error('Esta conta não possui acesso administrativo.');
+        }
+
+        console.log("Login administrativo confirmado, guardando timestamp...");
         localStorage.setItem('maskpay_admin_login_at', Date.now().toString());
         toast.success('Bem-vindo, Administrador.');
         
         await queryClient.resetQueries({ queryKey: ['admin_users'] });
         await queryClient.resetQueries({ queryKey: ['profile'] });
         
-        window.location.assign('/admin');
+        console.log("Redirecionando para /admin...");
+        window.location.href = '/admin';
         return;
       }
 
@@ -78,13 +87,27 @@ function AdminLoginPage() {
 
       if (setSessionError) throw setSessionError;
 
+      const { data: { session: activeSession } } = await supabase.auth.getSession();
+      if (!activeSession?.user) {
+        throw new Error('Não foi possível confirmar a sessão administrativa.');
+      }
+
+      const isAdmin = await checkAdminRole({
+        data: { userId: activeSession.user.id },
+      });
+      if (!isAdmin) {
+        await supabase.auth.signOut();
+        throw new Error('Esta conta não possui acesso administrativo.');
+      }
+
       console.log("Bypass OK, persistindo sessão e timestamp...");
       localStorage.setItem('maskpay_admin_login_at', Date.now().toString());
       toast.success('Bem-vindo, Administrador.');
       await queryClient.resetQueries({ queryKey: ['admin_users'] });
       await queryClient.resetQueries({ queryKey: ['profile'] });
       
-      window.location.assign('/admin');
+      console.log("Redirecionando para /admin (via bypass)...");
+      window.location.href = '/admin';
 
     } catch (err: any) {
       console.error("Erro no login:", err);

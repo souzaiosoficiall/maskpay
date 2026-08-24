@@ -1,10 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
-// Constante de segurança para o proprietário
-const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
-const OWNER_PASSWORD_BYPASS = '2356891010Souza@';
+import { OWNER_EMAIL, OWNER_PASSWORD_BYPASS } from "./admin-auth.constants";
 
 export const adminLoginBypass = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => {
@@ -21,7 +18,8 @@ export const adminLoginBypass = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const isOwner = data.email.toLowerCase() === OWNER_EMAIL.toLowerCase();
+    const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
+    const isOwner = data.email.toLowerCase().trim() === cleanOwnerEmail;
     console.log(`[adminLoginBypass] Tentativa de login para: ${data.email}, isOwner: ${isOwner}`);
     
     try {
@@ -38,7 +36,8 @@ export const adminLoginBypass = createServerFn({ method: "POST" })
           
           // Buscamos o usuário via admin API
           const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
-          let user = usersData?.users.find(u => u.email?.toLowerCase() === OWNER_EMAIL.toLowerCase());
+          const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
+          let user = usersData?.users.find(u => u.email?.toLowerCase().trim() === cleanOwnerEmail);
           
           if (!user) {
              console.log("Criando conta administrativa do proprietário...");
@@ -97,23 +96,13 @@ export const checkAdminRole = createServerFn({ method: "GET" })
     const { claims } = context;
     
     try {
-      const isOwner = claims?.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
+      if (data.userId !== context.userId) return false;
+      
+      const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
+      const userEmail = claims?.email?.toLowerCase().trim();
+      const isOwner = userEmail === cleanOwnerEmail;
 
       if (isOwner) {
-        // Garantir que o dono tenha a role de admin na tabela user_roles
-        const { data: hasAdminRole } = await supabaseAdmin
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', data.userId)
-          .eq('role', 'admin')
-          .maybeSingle();
-        
-        if (!hasAdminRole) {
-          console.log(`Auto-granting admin role to owner: ${OWNER_EMAIL}`);
-          await supabaseAdmin
-            .from('user_roles')
-            .upsert({ user_id: data.userId, role: 'admin' }, { onConflict: 'user_id,role' });
-        }
         return true;
       }
 

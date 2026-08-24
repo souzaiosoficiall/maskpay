@@ -5,7 +5,8 @@ import { OWNER_EMAIL } from "./admin-auth.constants";
 export const resetSystem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    if (context.claims?.email?.toLowerCase() !== OWNER_EMAIL.toLowerCase()) {
+    const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
+    if (context.claims?.email?.toLowerCase().trim() !== cleanOwnerEmail) {
       throw new Error("Não autorizado: Acesso restrito ao administrador proprietário.");
     }
 
@@ -16,7 +17,7 @@ export const resetSystem = createServerFn({ method: "POST" })
       const { data: users, error: fetchError } = await supabaseAdmin.auth.admin.listUsers();
       if (fetchError) throw fetchError;
 
-      const usersToDelete = users.users.filter(u => u.email?.toLowerCase() !== OWNER_EMAIL.toLowerCase());
+      const usersToDelete = users.users.filter(u => u.email?.toLowerCase().trim() !== cleanOwnerEmail);
 
       // 2. Delete other users (Auth delete cascades to profiles/wallets if foreign keys are set to cascade)
       // If not, we do it manually. Based on common Supabase patterns, they usually are.
@@ -44,7 +45,7 @@ export const resetSystem = createServerFn({ method: "POST" })
       const { data: ownerProfile } = await supabaseAdmin
         .from('profiles')
         .select('id')
-        .eq('email', OWNER_EMAIL)
+        .eq('email', cleanOwnerEmail)
         .single();
 
       if (ownerProfile) {

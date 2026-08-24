@@ -4,12 +4,29 @@ import { OWNER_EMAIL } from "./admin-auth.constants";
 
 const ensureAdmin = async (context: any) => {
   if (!context) throw new Error("Acesso negado: Contexto inválido.");
-  if (context.claims?.email?.toLowerCase() === OWNER_EMAIL.toLowerCase()) return context;
+  const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
+  const userEmail = context.claims?.email?.toLowerCase().trim();
+  if (userEmail === cleanOwnerEmail) return context;
+  
   if (context.supabase) {
-    const { data: isAdmin } = await context.supabase.rpc('has_role', { 
+    let isAdmin = false;
+    const { data: rpcResult, error: rpcError } = await context.supabase.rpc('has_role', { 
       _user_id: context.userId, 
       _role: 'admin' 
     });
+    
+    if (!rpcError) {
+      isAdmin = rpcResult === true;
+    } else {
+      const { data: roleRow } = await context.supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', context.userId)
+        .eq('role', 'admin')
+        .maybeSingle();
+      isAdmin = !!roleRow;
+    }
+    
     if (isAdmin) return context;
   }
   throw new Error("Não autorizado.");

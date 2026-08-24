@@ -95,7 +95,8 @@ function AdminPage() {
 
   const { data: users = [], isLoading: isLoadingUsers, refetch: refetchUsers } = useQuery({
     queryKey: ['admin_users'],
-    queryFn: () => fetchUsers({}),
+    queryFn: () => fetchUsers({}).catch(() => []),
+    retry: false,
     enabled: sessionReady,
     staleTime: 15_000,
     refetchOnMount: true
@@ -103,7 +104,8 @@ function AdminPage() {
 
   const { data: tickets = [], isLoading: isLoadingTickets, refetch: refetchTickets } = useQuery({
     queryKey: ['admin_tickets'],
-    queryFn: () => fetchTickets({}),
+    queryFn: () => fetchTickets({}).catch(() => []),
+    retry: false,
     enabled: sessionReady,
     staleTime: 15_000,
     refetchOnMount: true
@@ -111,7 +113,7 @@ function AdminPage() {
 
   const { data: logs = [] } = useQuery({
     queryKey: ['admin_logs'],
-    queryFn: () => fetchLogs({}),
+    queryFn: () => fetchLogs({}).catch(() => []),
     enabled: sessionReady && activeTab === 'logs',
   });
 

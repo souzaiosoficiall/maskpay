@@ -32,7 +32,7 @@ function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
   const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] || process.env['SUPABASE_URL'] || "https://oxgnuxtjqrvxcwtkrcvs.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || import.meta.env['VITE_SUPABASE_ANON_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY'] || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94Z251eHRqcXJ2eGN3dGtyY3ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MzkxOTQsImV4cCI6MjEwMzExNTE5NH0.qYJsDMJv-8B3ONZe2FAEtxDk1XIHygp5priof8gvjlU";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || import.meta.env['VITE_SUPABASE_ANON_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY'] || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94Z251eHRqcXJ2eGN3dGtyY3ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MzkxOTQsImV4cCI6MjEwMzExNTE5NH0.qYJsDMJv-8B3ONZe2FAEtxDk1XIHygp5priof8gvjlU";
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
