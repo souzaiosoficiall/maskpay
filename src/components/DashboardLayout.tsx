@@ -202,6 +202,7 @@ export default function DashboardLayout() {
           onClick={async () => {
             try {
               window.localStorage.removeItem('maskpay-login-timestamp');
+              try { sessionStorage.removeItem('maskpay-app-unlocked'); } catch {}
               await supabase.auth.signOut({ scope: 'local' });
             } catch {}
             window.location.href = '/auth?mode=login';

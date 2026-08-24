@@ -9,7 +9,7 @@
 // was out of scope for this change and we don't want to alter existing
 // app behavior.
 
-const SW_VERSION = "maskpay-push-v1";
+const SW_VERSION = "maskpay-push-v2";
 
 self.addEventListener("install", () => {
   // Activate this SW as soon as it's installed instead of waiting for all
@@ -46,12 +46,48 @@ self.addEventListener("push", (event) => {
       url: payload.url || "/dashboard",
       ...(payload.data || {}),
     },
-    // renotify only makes sense when tag is reused; vibration is a no-op
-    // outside Android but harmless elsewhere.
     vibrate: [100, 50, 100],
   };
 
-  event.waitUntil(self.registration.showNotification(payload.title || "MaskPay", options));
+  event.waitUntil(
+    (async () => {
+      // Always show system notification
+      await self.registration.showNotification(payload.title || "MaskPay", options);
+
+      // Notify any open app windows so the in-app modal can appear in real time
+      try {
+        const allClients = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+        const message = {
+          type: "MASKPAY_FOREGROUND_NOTIFICATION",
+          id: payload.id || payload.tag || `push-${Date.now()}`,
+          title: payload.title || "MaskPay",
+          body: payload.body || "",
+          description: payload.body || "",
+          url: payload.url || "/dashboard",
+        };
+        for (const client of allClients) {
+          try {
+            client.postMessage(message);
+          } catch {
+            // ignore per-client failures
+          }
+        }
+        // Also broadcast for same-origin listeners
+        try {
+          const bc = new BroadcastChannel("maskpay-notifications");
+          bc.postMessage(message);
+          bc.close();
+        } catch {
+          // BroadcastChannel may be unavailable in some SW contexts
+        }
+      } catch {
+        // ignore
+      }
+    })(),
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

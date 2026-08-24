@@ -1,12 +1,13 @@
-import { createFileRoute, Outlet, useNavigate, useLocation } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, useLocation } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { getProfile, type ProfileWithRole } from '@/lib/settings.functions';
 import { updateLastAccess } from '@/lib/auth-session.functions';
 import { useSessionReady } from '@/hooks/useSessionReady';
 import { supabase } from '@/integrations/supabase/client';
 import DashboardLayout from '@/components/DashboardLayout';
+import { AppLockScreen, isAppUnlocked, markAppUnlocked } from '@/components/AppLockScreen';
 
 export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,
@@ -18,6 +19,42 @@ function AuthenticatedLayout() {
   const sessionReady = useSessionReady();
   const fetchProfile = useServerFn(getProfile);
   const doUpdateLastAccess = useServerFn(updateLastAccess);
+
+  // Lock screen: require Face ID once per browser session (sessionStorage)
+  const [unlocked, setUnlocked] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return isAppUnlocked();
+  });
+
+  const handleUnlocked = useCallback(() => {
+    markAppUnlocked();
+    setUnlocked(true);
+  }, []);
+
+  // Re-lock when the PWA returns from background after being hidden for a while
+  useEffect(() => {
+    let hiddenAt: number | null = null;
+    const RELOCK_AFTER_MS = 60_000; // 1 min in background → ask Face ID again
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+        return;
+      }
+      if (hiddenAt && Date.now() - hiddenAt > RELOCK_AFTER_MS) {
+        setUnlocked(false);
+        try {
+          sessionStorage.removeItem('maskpay-app-unlocked');
+        } catch {
+          // ignore
+        }
+      }
+      hiddenAt = null;
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
 
   const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ['profile'],
@@ -44,6 +81,11 @@ function AuthenticatedLayout() {
           console.log('[AuthenticatedLayout] Session expired (>24h inactivity).');
           supabase.auth.signOut().then(() => {
             window.localStorage.removeItem('maskpay-login-timestamp');
+            try {
+              sessionStorage.removeItem('maskpay-app-unlocked');
+            } catch {
+              // ignore
+            }
             window.location.href = '/auth?mode=login';
           });
           return;
@@ -92,6 +134,11 @@ function AuthenticatedLayout() {
       }
     }
   }, [profile, isProfileLoading, sessionReady, location.pathname, navigate]);
+
+  // Show lock screen until Face ID succeeds (only when we know there is a session)
+  if (sessionReady && !unlocked) {
+    return <AppLockScreen onUnlocked={handleUnlocked} />;
+  }
 
   return <DashboardLayout />;
 }

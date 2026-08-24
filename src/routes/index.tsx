@@ -23,6 +23,7 @@ import { motion, useMotionValue, useSpring, useTransform, animate, AnimatePresen
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import Lenis from 'lenis';
+import { supabase } from '@/integrations/supabase/client';
 
 const coinsAsset = { url: "/assets/coins.png" };
 const maskLogoAsset = { url: "/assets/mask_logo.png" };
@@ -176,6 +177,18 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 function LandingPage() {
+  // If already logged in, skip homepage and go straight to the account (lock screen / dashboard)
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session?.access_token) {
+        window.location.replace('/dashboard');
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const [revenue, setRevenue] = useState(17080);
   const [view, setView] = useState<'Mensal' | 'Semanal' | 'Diário'>('Mensal');
   const [chartData, setChartData] = useState([

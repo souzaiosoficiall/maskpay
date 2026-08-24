@@ -183,6 +183,7 @@ function AuthPage() {
         }
 
         window.localStorage.setItem('maskpay-login-timestamp', Date.now().toString());
+        try { sessionStorage.setItem('maskpay-app-unlocked', '1'); } catch {}
         window.location.href = '/dashboard';
         return;
       }
@@ -272,7 +273,7 @@ function AuthPage() {
         });
 
         toast.success('Conta criada com sucesso!');
-        
+        try { sessionStorage.setItem('maskpay-app-unlocked', '1'); } catch {}
         // Use window.location.href to ensure a clean state and skip any cached auth checks
         window.location.href = '/dashboard';
         return;
