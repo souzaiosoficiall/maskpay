@@ -28,14 +28,16 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (!sessionReady) return;
     
-    doUpdateLastAccess({}).catch(() => undefined);
+    // Update server-side access time
+    doUpdateLastAccess({});
     
-    const lastAccess = window.localStorage.getItem('maskpay-login-timestamp');
+    // Update client-side local session expiry logic
+    const lastLogin = window.localStorage.getItem('maskpay-login-timestamp');
     const now = Date.now();
     const twentyFourHours = 24 * 60 * 60 * 1000;
 
-    if (lastAccess && (now - parseInt(lastAccess, 10)) > twentyFourHours) {
-      console.log("[AuthenticatedLayout] Session expired (>24h inactivity). Logging out.");
+    if (lastLogin && (now - parseInt(lastLogin)) > twentyFourHours) {
+      console.log("[AuthenticatedLayout] Session expired (>24h). Logging out.");
       supabase.auth.signOut().then(() => {
         window.localStorage.removeItem('maskpay-login-timestamp');
         window.location.href = '/auth?mode=login';
@@ -43,6 +45,7 @@ function AuthenticatedLayout() {
       return;
     }
 
+    // Update the timestamp on every active access
     window.localStorage.setItem('maskpay-login-timestamp', now.toString());
   }, [sessionReady, location.pathname, doUpdateLastAccess]);
 
@@ -58,25 +61,26 @@ function AuthenticatedLayout() {
       return;
     }
 
+    // Se o perfil existe mas não é admin, verifica se a conta está verificada
     if (profile.role !== 'admin') {
       const isVerified = profile.verification_status === 'verified';
-      const alreadySubmitted =
-        profile.verification_status === 'pending' ||
-        profile.verification_status === 'pending_review';
+      const isPending = profile.verification_status === 'pending' || profile.verification_status === 'pending_review';
       
-      const allowedPaths = ['/dashboard', '/support', '/verify', '/settings'];
+      // Permitir acesso APENAS a rotas essenciais se não estiver verificado
+      const allowedPaths = ['/dashboard', '/support', '/verify'];
       const currentPath = location.pathname;
       
       const isAllowed = allowedPaths.some(path => currentPath === path || currentPath.startsWith(path + '/'));
 
+      // Se não estiver verificado e não for uma rota permitida, volta pro dashboard
       if (!isVerified && !isAllowed) {
         console.log(`[AuthenticatedLayout] Access denied to ${currentPath} (KYC pending). Redirecting to dashboard.`);
         navigate({ to: '/dashboard', replace: true });
         return;
       }
 
-      // Only block /verify after documents were submitted
-      if (alreadySubmitted && currentPath.startsWith('/verify')) {
+      // Se já enviou documentos (pending), não pode acessar /verify de novo
+      if (isPending && currentPath.startsWith('/verify')) {
         console.log(`[AuthenticatedLayout] Verification already pending. Redirecting to dashboard.`);
         navigate({ to: '/dashboard', replace: true });
         return;

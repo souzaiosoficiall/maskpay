@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils';
 import maskPlatformAsset from "@/lib/mask-asset";
 import { useServerFn } from '@tanstack/react-start';
 import { validateCPFAction } from '@/lib/identity.functions';
-import { registerUser } from '@/lib/register.functions';
 
 
 export const Route = createFileRoute('/auth')({
@@ -46,7 +45,6 @@ function AuthPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const validateCPFServer = useServerFn(validateCPFAction);
-  const doRegister = useServerFn(registerUser);
   const [isValidatingCPF, setIsValidatingCPF] = useState(false);
   const [isCPFVerified, setIsCPFVerified] = useState(false);
 
@@ -224,36 +222,49 @@ function AuthPage() {
         return;
       }
 
-      // Registration via server (admin.createUser with email_confirm: true).
-      // No confirmation e-mail is sent. Profile + wallet are created with service role.
-      await doRegister({
-        data: {
-          email: email.trim(),
-          password,
-          fullName: fullName.trim(),
-          document: document.trim(),
-          phone: phone.trim(),
-          revenue: revenue || undefined,
-          accountType,
-        },
-      });
-
-      const { error: loginAfterRegError } = await supabase.auth.signInWithPassword({
+      // Registration
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            document: document,
+            phone: phone,
+            revenue_bracket: revenue,
+            account_type: accountType,
+            email_confirm: true // Attempting to auto-confirm if Supabase allows via this metadata or hook
+          }
+        }
       });
 
-      if (loginAfterRegError) {
-        toast.success('Conta criada! Faça login para continuar.');
-        window.location.href = '/auth?mode=login';
+
+      if (signUpError) throw signUpError;
+
+      if (signUpData.user) {
+        // Create profile using RPC or admin client if possible, but here we use the user's client
+        // to ensure the profile exists before redirecting.
+        const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
+        const isOwner = email.toLowerCase() === OWNER_EMAIL.toLowerCase();
+        
+        await supabase.from('profiles').upsert({
+          id: signUpData.user.id,
+          email: email.trim(),
+          full_name: fullName.trim(),
+          document: document.trim(),
+          phone: phone.trim(),
+          kyc_status: isOwner ? 'verified' : 'pending_review',
+          verification_status: isOwner ? 'verified' : 'unverified',
+          status: isOwner ? 'active' : 'active',
+          account_route: 'WHITE'
+        });
+
+        toast.success('Conta criada com sucesso!');
+        
+        // Use window.location.href to ensure a clean state and skip any cached auth checks
+        window.location.href = '/dashboard';
         return;
       }
-
-      queryClient.clear();
-      window.localStorage.setItem('maskpay-login-timestamp', Date.now().toString());
-      toast.success('Conta criada com sucesso!');
-      window.location.href = '/dashboard';
-      return;
     } catch (err: any) {
       setError(err.message || 'Erro ao processar solicitação');
     } finally {

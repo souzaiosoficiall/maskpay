@@ -6,26 +6,64 @@ import type { Tables } from "@/integrations/supabase/types";
 
 export type ProfileWithRole = Tables<'profiles'> & { role: 'admin' | 'user' };
 
-const PROFILE_COLS =
-  "id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at";
-
-/**
- * Always returns a usable profile for the authenticated user.
- * Never throws for "missing profile" — creates/heals the row via service role
- * so /verify and the dashboard never get stuck on "não foi possível carregar".
- */
 export const getProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<ProfileWithRole> => {
-    const { userId } = context;
+    const { supabase, userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const OWNER_EMAIL = "souzaiosoficial@gmail.com";
-    const userEmail = (context.claims?.email || "").toLowerCase().trim();
+    const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
+    const userEmail = context.claims?.email?.toLowerCase();
     const isOwner = userEmail === OWNER_EMAIL.toLowerCase();
+    
+    console.log(`[getProfile] userId: ${userId}, email: ${context.claims?.email}, isOwner: ${isOwner}`);
 
-    const maskPII = (p: any, requesterRole: "admin" | "user") => {
-      if (requesterRole === "admin" || p.id === userId) return p;
+    const fetchRole = async (): Promise<'admin' | 'user'> => {
+      const isOwnerEmail = isOwner;
+
+      // Auto-grant admin role to the owner email if not already present
+      if (isOwnerEmail) {
+        const { data: hasAdminRole } = await supabaseAdmin
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('role', 'admin')
+          .maybeSingle();
+        
+        if (!hasAdminRole) {
+          console.log(`Auto-granting admin role to owner: ${OWNER_EMAIL}`);
+          await supabaseAdmin
+            .from('user_roles')
+            .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id,role' });
+        }
+        return 'admin';
+      }
+
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: userId,
+        _role: 'admin',
+      });
+      if (roleError) {
+        console.error("Role error:", roleError);
+        return 'user';
+      }
+      return isAdmin ? 'admin' : 'user';
+    };
+
+    let { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
+      .eq('id', userId)
+      .maybeSingle();
+
+    // IMPORTANT: Use the full_name from the profile, don't force fallbacks like "PROPRIETÁRIO"
+    const role = await fetchRole();
+
+    // Only mask PII if the requester is NOT the owner of the profile
+    const maskPII = (p: any, requesterRole: 'admin' | 'user') => {
+      // If the requester is an admin OR is the owner of the profile, don't mask
+      if (requesterRole === 'admin' || p.id === userId) return p;
+      
       return {
         ...p,
         email: maskEmail(p.email),
@@ -34,168 +72,99 @@ export const getProfile = createServerFn({ method: "GET" })
       };
     };
 
-    const resolveRole = async (): Promise<"admin" | "user"> => {
-      if (isOwner) {
-        try {
-          await supabaseAdmin
-            .from("user_roles")
-            .upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
-        } catch {
-          // ignore
-        }
-        return "admin";
-      }
-      try {
-        const { data } = await supabaseAdmin
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId)
-          .eq("role", "admin")
-          .maybeSingle();
-        return data ? "admin" : "user";
-      } catch {
-        return "user";
-      }
-    };
+    // Force sync from Auth metadata if the record exists but fields are null
+    if (data) {
+      const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (authUser?.user_metadata) {
+        const meta = authUser.user_metadata;
+        const updates: any = {};
+        
+        if (!data.full_name || data.full_name === 'Proprietário') updates.full_name = meta['full_name'] || meta['name'];
+        if (!data.document) updates.document = meta['document'];
+        if (!data.phone) updates.phone = meta['phone'];
+        if (!data.email) updates.email = authUser.email;
 
-    const role = await resolveRole();
-
-    // 1) Read profile with service role (bypasses RLS — avoids empty/error on client policies)
-    let profile: any = null;
-    try {
-      const { data, error } = await supabaseAdmin
-        .from("profiles")
-        .select(PROFILE_COLS)
-        .eq("id", userId)
-        .maybeSingle();
-      if (!error && data) profile = data;
-      if (error) console.error("[getProfile] admin select error:", error);
-    } catch (err) {
-      console.error("[getProfile] admin select threw:", err);
-    }
-
-    // 2) Auth metadata for healing missing fields / creating profile
-    let authUser: any = null;
-    try {
-      const res = await supabaseAdmin.auth.admin.getUserById(userId);
-      authUser = res?.data?.user ?? null;
-    } catch (err) {
-      console.error("[getProfile] getUserById failed:", err);
-    }
-
-    const meta = authUser?.user_metadata || {};
-    const metaName = meta["full_name"] || meta["name"] || "";
-    const metaDoc = meta["document"] || null;
-    const metaPhone = meta["phone"] || null;
-    const metaEmail = authUser?.email || context.claims?.email || null;
-
-    // 3) Heal incomplete profile fields
-    if (profile) {
-      const updates: Record<string, unknown> = {};
-      if (!profile.full_name || profile.full_name === "Proprietário") {
-        if (metaName) updates.full_name = metaName;
-      }
-      if (!profile.document && metaDoc) updates.document = metaDoc;
-      if (!profile.phone && metaPhone) updates.phone = metaPhone;
-      if (!profile.email && metaEmail) updates.email = metaEmail;
-
-      if (Object.keys(updates).length > 0) {
-        try {
+        if (Object.keys(updates).length > 0) {
           const { data: updated } = await supabaseAdmin
-            .from("profiles")
+            .from('profiles')
             .update(updates)
-            .eq("id", userId)
-            .select(PROFILE_COLS)
+            .eq('id', userId)
+            .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
             .maybeSingle();
-          if (updated) profile = updated;
-        } catch (err) {
-          console.error("[getProfile] heal update failed:", err);
+          
+          if (updated) data = updated;
         }
       }
-
-      // Ensure wallet exists
-      try {
-        const { data: wallet } = await supabaseAdmin
-          .from("wallets")
-          .select("id")
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (!wallet) {
-          await supabaseAdmin.from("wallets").insert({
-            user_id: userId,
-            balance: 0,
-            currency: "BRL",
-          } as any);
-        }
-      } catch {
-        // non-fatal
-      }
-
-      return maskPII({ ...profile, role }, role) as ProfileWithRole;
     }
 
-    // 4) Profile missing — create with service role
-    try {
-      const { data: created, error: createError } = await supabaseAdmin
-        .from("profiles")
-        .upsert(
-          {
-            id: userId,
-            email: metaEmail,
-            full_name: metaName || "",
-            document: metaDoc,
-            phone: metaPhone,
-            verification_status: isOwner ? "verified" : "unverified",
-            kyc_status: isOwner ? "verified" : "unverified",
-            status: "active",
-            account_route: "WHITE",
-          } as any,
-          { onConflict: "id" },
-        )
-        .select(PROFILE_COLS)
-        .maybeSingle();
-
-      if (!createError && created) {
-        try {
-          const { data: wallet } = await supabaseAdmin
-            .from("wallets")
-            .select("id")
-            .eq("user_id", userId)
-            .maybeSingle();
-          if (!wallet) {
-            await supabaseAdmin.from("wallets").insert({
-              user_id: userId,
-              balance: 0,
-              currency: "BRL",
-            } as any);
-          }
-        } catch {
-          // non-fatal
-        }
-        return maskPII({ ...created, role }, role) as ProfileWithRole;
-      }
-      if (createError) console.error("[getProfile] profile upsert error:", createError);
-    } catch (err) {
-      console.error("[getProfile] profile upsert threw:", err);
+    if (error) {
+       console.error("Profile fetch error:", error);
+       throw new Error(error.message);
     }
 
-    // 5) Last resort: in-memory profile so the UI (incl. /verify) never blocks
-    return maskPII(
-      {
+    if (data) {
+      return maskPII({ ...data, role }, role);
+    }
+
+    // Profile row doesn't exist yet — create it using admin client to bypass RLS
+    const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const userMetadata = authUser?.user_metadata || {};
+    
+    // Use the name from metadata (filled during sign up)
+    const fullName = userMetadata['full_name'] || userMetadata['name'] || '';
+
+    const document = userMetadata['document'] || null;
+    const phone = userMetadata['phone'] || null;
+    const email = authUser?.email || context.claims?.email || null;
+
+    const { data: created, error: createError } = await supabaseAdmin
+      .from('profiles')
+      .insert({ 
+        id: userId, 
+        email: email,
+        full_name: fullName,
+        document: document,
+        phone: phone,
+        verification_status: isOwner ? 'verified' : 'unverified',
+        kyc_status: isOwner ? 'verified' : 'unverified',
+        status: isOwner ? 'active' : 'active',
+        account_route: 'WHITE'
+      })
+      .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
+      .maybeSingle();
+
+    if (createError || !created) {
+      // A criação da linha pode ser bloqueada pelas regras de segurança do banco
+      // (falta a policy de INSERT em public.profiles). Nesse caso não derrubamos a
+      // aplicação: devolvemos um perfil temporário em memória.
+      console.error("Profile creation error:", createError);
+      return maskPII({
         id: userId,
-        email: metaEmail,
-        full_name: metaName || "",
-        document: metaDoc,
-        phone: metaPhone,
-        status: "active",
-        verification_status: isOwner ? "verified" : "unverified",
-        kyc_status: isOwner ? "verified" : "unverified",
-        account_route: "WHITE",
+        email,
+        full_name: fullName,
+        document,
+        phone,
+        status: 'active',
+        verification_status: isOwner ? 'verified' : 'unverified',
+        kyc_status: isOwner ? 'verified' : 'unverified',
+        account_route: 'WHITE',
         created_at: new Date().toISOString(),
         role,
-      } as any,
-      role,
-    ) as ProfileWithRole;
+      } as any, role);
+    }
+
+    // Ensure the user also has a wallet
+    const { data: wallet } = await supabaseAdmin
+      .from('wallets')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+      
+    if (!wallet) {
+      await supabaseAdmin.from('wallets').insert({ user_id: userId });
+    }
+
+    return maskPII({ ...(created as Tables<'profiles'>), role }, role);
   });
 
 export const updateAccessPassword = createServerFn({ method: "POST" })

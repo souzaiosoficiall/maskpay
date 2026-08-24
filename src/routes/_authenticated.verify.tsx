@@ -60,21 +60,12 @@ function VerifyPage() {
   const fetchProfile = useServerFn(getProfile);
   const doSubmitVerification = useServerFn(submitVerification);
 
-  const { data: profile, isLoading: isProfileLoading, isFetching, isError, refetch, error } = useQuery({
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ['profile'],
     queryFn: () => fetchProfile({}),
     enabled: sessionReady,
     refetchOnWindowFocus: true,
-    retry: 3,
-    retryDelay: 800,
-  }) as {
-    data: ProfileWithRole | undefined;
-    isLoading: boolean;
-    isFetching: boolean;
-    isError: boolean;
-    refetch: () => void;
-    error: Error | null;
-  };
+  }) as { data: ProfileWithRole | undefined, isLoading: boolean };
 
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +87,13 @@ function VerifyPage() {
         cacheControl: '3600'
       });
     
-    if (error) throw error;
+    if (error) {
+      const msg = error.message || 'Falha no upload';
+      if (/bucket not found/i.test(msg)) {
+        throw new Error('Armazenamento de documentos ainda não está pronto. Tente novamente em instantes.');
+      }
+      throw new Error(msg);
+    }
       
     return path;
   };
@@ -109,11 +106,22 @@ function VerifyPage() {
 
     setIsSubmitting(true);
     try {
+      // Folder MUST be the auth user id — storage RLS checks
+      // (storage.foldername(name))[1] = auth.uid()::text
+      const { data: { user } } = await supabase.auth.getUser();
+      const folder = user?.id || profile?.id;
+      if (!folder) {
+        throw new Error('Sessão inválida. Faça login novamente.');
+      }
+
       const timestamp = Date.now();
-      const folder = effectiveProfile?.id && effectiveProfile.id !== 'pending' ? effectiveProfile.id : 'anonymous';
-      const frontPath = `${folder}/front_${timestamp}.${files.front.name.split('.').pop()}`;
-      const backPath = `${folder}/back_${timestamp}.${files.back.name.split('.').pop()}`;
-      const selfiePath = `${folder}/selfie_${timestamp}.${files.selfie.name.split('.').pop()}`;
+      const ext = (name: string) => {
+        const e = name.split('.').pop()?.toLowerCase();
+        return e && e.length <= 5 ? e : 'jpg';
+      };
+      const frontPath = `${folder}/front_${timestamp}.${ext(files.front.name)}`;
+      const backPath = `${folder}/back_${timestamp}.${ext(files.back.name)}`;
+      const selfiePath = `${folder}/selfie_${timestamp}.${ext(files.selfie.name)}`;
 
       await Promise.all([
         uploadFile(files.front, frontPath),
@@ -130,12 +138,10 @@ function VerifyPage() {
         }
       });
 
-      // Clear profile query to force fresh state on dashboard
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       
       toast.success('Documentos enviados com sucesso! O suporte tem até 24 horas para realizar a liberação da conta.');
       
-      // Delay navigation slightly to let state update
       setTimeout(() => {
         navigate({ to: '/dashboard' });
       }, 500);
@@ -149,8 +155,7 @@ function VerifyPage() {
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => s - 1);
 
-  // Wait for session + profile. getProfile is resilient and should always return a row.
-  if (!sessionReady || isProfileLoading || (isFetching && !profile)) {
+  if (isProfileLoading && sessionReady) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8 animate-in fade-in duration-700">
         <div className="relative">
@@ -160,16 +165,40 @@ function VerifyPage() {
           <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full -z-10 animate-pulse"></div>
         </div>
         <div className="text-center space-y-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/90">Carregando verificação...</p>
-          <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/40">Preparando o envio dos documentos</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/90">Carregando seus dados...</p>
+          <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/40">Isso levará apenas alguns segundos</p>
         </div>
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate({ to: '/dashboard' })} 
+          className="group flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-all bg-white/5 px-6 h-10 rounded-xl"
+        >
+          <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
+          Voltar ao Dashboard
+        </Button>
       </div>
     );
   }
 
-  // Soft fallback: still show the KYC form even if profile payload is incomplete.
-  // Uploads only need an id for the storage path; submitVerification uses the auth userId server-side.
-  const effectiveProfile = profile || ({ id: 'pending', verification_status: 'unverified' } as ProfileWithRole);
+  if (!profile && sessionReady) {
+     return (
+       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8 animate-in zoom-in-95 duration-500">
+         <div className="w-20 h-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mb-2">
+            <Lock className="w-8 h-8 text-primary/40" />
+         </div>
+         <div className="text-center space-y-2 px-6">
+           <h2 className="text-lg font-black uppercase tracking-tighter">Sessão Expirada</h2>
+           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">Sessão não identificada. Por favor, realize o login novamente para continuar.</p>
+         </div>
+         <Button 
+          onClick={() => window.location.href = '/auth'} 
+          className="bg-white text-black hover:bg-white/90 rounded-2xl px-12 h-14 font-black uppercase tracking-widest text-xs shadow-xl shadow-white/10 hover:scale-105 transition-all"
+         >
+            Ir para Login
+         </Button>
+       </div>
+     );
+  }
 
   return (
     <div className="max-w-3xl mx-auto py-6 md:py-10 px-4 pb-[env(safe-area-inset-bottom)]">

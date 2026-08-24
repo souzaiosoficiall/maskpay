@@ -53,8 +53,6 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'
       persistSession: true,
       storageKey: 'maskpay-auth-session',
       autoRefreshToken: true,
-      detectSessionInUrl: true,
-      flowType: 'pkce',
     }
   });
 }

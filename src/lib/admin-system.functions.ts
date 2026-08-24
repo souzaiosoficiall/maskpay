@@ -45,53 +45,37 @@ export const getAllUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }: { context: any }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await ensureAdmin(context);
+    
+    const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+    if (authError) {
+      console.error("Erro ao buscar usuários do Auth:", authError);
+      return [];
+    }
 
-    // Source of truth: profiles (listUsers alone hid valid accounts).
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
       .order('created_at', { ascending: false });
 
-    if (profilesError) {
-      console.error("Erro ao buscar profiles:", profilesError);
-      throw new Error(profilesError.message);
-    }
+    const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-    const authById = new Map<string, any>();
-    try {
-      let page = 1;
-      const perPage = 1000;
-      while (page <= 10) {
-        const { data: pageData, error: authError } = await supabaseAdmin.auth.admin.listUsers({
-          page,
-          perPage,
-        });
-        if (authError) break;
-        const users = pageData?.users || [];
-        for (const u of users) authById.set(u.id, u);
-        if (users.length < perPage) break;
-        page += 1;
-      }
-    } catch (err) {
-      console.error("Auth listUsers fallback failed:", err);
-    }
-
-    const data = (profiles || []).map((p: any) => {
-      const authUser = authById.get(p.id);
+    const data = (authUsers.users || []).map(user => {
+      const p = profilesMap.get(user.id);
       return {
-        id: p.id,
-        email: p.email || authUser?.email || 'N/A',
-        full_name: p.full_name || authUser?.user_metadata?.['full_name'] || authUser?.user_metadata?.['name'] || 'Usuário sem Nome',
-        document: p.document || authUser?.user_metadata?.['document'] || null,
-        phone: p.phone || authUser?.user_metadata?.['phone'] || null,
-        status: p.status || 'active',
-        verification_status: p.verification_status || 'unverified',
-        kyc_status: p.kyc_status || 'unverified',
-        account_route: p.account_route || 'WHITE',
-        created_at: p.created_at || authUser?.created_at || new Date().toISOString(),
+        id: user.id,
+        email: p?.email || user.email || 'N/A',
+        full_name: p?.full_name || user.user_metadata?.['full_name'] || user.user_metadata?.['name'] || 'Usuário sem Nome',
+        document: p?.document || user.user_metadata?.['document'] || null,
+        phone: p?.phone || user.user_metadata?.['phone'] || null,
+        status: p?.status || 'active',
+        verification_status: p?.verification_status || 'unverified',
+        kyc_status: p?.kyc_status || 'unverified',
+        account_route: p?.account_route || 'WHITE',
+        created_at: p?.created_at || user.created_at
       };
     });
 
+    // Sort by created_at descending
     data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     const { data: wallets } = await supabaseAdmin
