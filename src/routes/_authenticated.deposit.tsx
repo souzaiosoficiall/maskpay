@@ -110,13 +110,13 @@ function DepositPage() {
   }, [pixData]);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-10 pb-16 font-sans relative z-10">
+    <div className="max-w-3xl mx-auto space-y-6 md:space-y-10 pb-12 md:pb-16 font-sans relative z-10">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-4xl font-black tracking-tighter uppercase mb-2">Adicionar valor |</h1>
+        <h1 className="text-2xl md:text-4xl font-black tracking-tighter uppercase mb-2">Adicionar valor |</h1>
         <p className="text-muted-foreground font-semibold text-base">Adicione saldo à sua conta via Pix de forma instantânea.</p>
       </motion.div>
 
@@ -127,7 +127,7 @@ function DepositPage() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <Card className="border-white/5 bg-background border-2 rounded-[2rem] p-2">
+          <Card className="border-white/5 bg-background border-2 rounded-2xl md:rounded-[2rem] p-2">
             <CardHeader className="flex flex-row items-center justify-between pb-4">
               <span className="text-xs font-black uppercase tracking-[0.15em] text-muted-foreground">Saldo atual</span>
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/5">
@@ -152,7 +152,7 @@ function DepositPage() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.4 }}
             >
-              <Card className="border-white/5 bg-background border-2 rounded-[2.5rem] p-4 md:p-8">
+              <Card className="border-white/5 bg-background border-2 rounded-2xl md:rounded-[2.5rem] p-3 md:p-8">
                 <form onSubmit={handleSubmit} className="space-y-8">
                   <div className="space-y-6">
                     <h2 className="text-xl font-black uppercase tracking-tight">Dados do Depósito</h2>
@@ -215,7 +215,7 @@ function DepositPage() {
               exit={{ opacity: 0, scale: 1.05 }}
               transition={{ duration: 0.5 }}
             >
-              <Card className="border-white/5 bg-background border-2 rounded-[2.5rem] p-4 md:p-8">
+              <Card className="border-white/5 bg-background border-2 rounded-2xl md:rounded-[2.5rem] p-3 md:p-8">
                 <div className="flex flex-col items-center space-y-8">
                   <div className="text-center space-y-2">
                     <h2 className="text-xl font-black uppercase tracking-tight">Pagamento Gerado</h2>
@@ -234,12 +234,18 @@ function DepositPage() {
                     transition={{ delay: 0.2, type: 'spring' }}
                     className="bg-white p-6 rounded-[2rem] shadow-[0_0_50px_rgba(255,255,255,0.05)] border-8 border-white/5"
                   >
-                    <QRCodeSVG 
-                      value={pixData.qrCode} 
-                      size={200}
-                      level="H"
-                      includeMargin={false}
-                    />
+                    {pixData.qrCode && pixData.qrCode.startsWith('00020') ? (
+                      <QRCodeSVG 
+                        value={pixData.qrCode} 
+                        size={180}
+                        level="M"
+                        includeMargin={false}
+                      />
+                    ) : (
+                      <div className="w-[180px] h-[180px] flex items-center justify-center text-xs text-black font-bold text-center p-4">
+                        Use o código copia e cola abaixo
+                      </div>
+                    )}
                   </motion.div>
 
                   <div className="w-full space-y-4">

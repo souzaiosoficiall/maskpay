@@ -26,13 +26,16 @@ function getWebhookUrl(): string {
 /**
  * Extracts QR / copia-e-cola from heterogeneous EvoPay response shapes.
  */
-function extractPixCodes(evoData: any): { qrCode: string | null; copyPaste: string | null } {
+function extractPixCodes(evoData: any): {
+  emv: string | null;
+  qrImageBase64: string | null;
+} {
   if (!evoData || typeof evoData !== "object") {
-    return { qrCode: null, copyPaste: null };
+    return { emv: null, qrImageBase64: null };
   }
-  const copyPaste =
+  // EMV / copia-e-cola (must be the PIX payload string, NOT base64 image)
+  const emv =
     evoData.qrCodeText ||
-    evoData.qrCode ||
     evoData.brCode ||
     evoData.emv ||
     evoData.pixCopyPaste ||
@@ -40,17 +43,18 @@ function extractPixCodes(evoData: any): { qrCode: string | null; copyPaste: stri
     evoData.copy_paste ||
     evoData.copyPaste ||
     evoData.payload ||
+    (typeof evoData.qrCode === "string" && evoData.qrCode.startsWith("00020")
+      ? evoData.qrCode
+      : null) ||
     null;
 
-  const qrCode =
+  const qrImageBase64 =
     evoData.qrCodeBase64 ||
     evoData.qrCodeImage ||
     evoData.pix_qrcode_base64 ||
-    evoData.qrcode ||
-    evoData.qrCode ||
-    copyPaste;
+    null;
 
-  return { qrCode: qrCode || null, copyPaste: copyPaste || null };
+  return { emv: emv || null, qrImageBase64: qrImageBase64 || null };
 }
 
 /**
@@ -122,7 +126,7 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
       });
 
       const providerId = evoData?.id || evoData?.transactionId || evoData?.transaction_id || null;
-      const { qrCode, copyPaste } = extractPixCodes(evoData);
+      const { emv, qrImageBase64 } = extractPixCodes(evoData);
 
       await (supabase.from("transactions") as any)
         .update({
@@ -131,16 +135,20 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
         })
         .eq("id", tx.id);
 
-      if (!copyPaste && !qrCode) {
-        console.error("[Audit] EvoPay returned success but no QR/copy-paste fields:", evoData);
+      if (!emv) {
+        console.error("[Audit] EvoPay returned success but no EMV/copy-paste fields:", {
+          keys: evoData && typeof evoData === "object" ? Object.keys(evoData) : [],
+        });
         throw new Error(
-          "A adquirente criou a cobrança, mas não retornou o QR Code. Verifique o formato da resposta nos logs."
+          "A adquirente criou a cobrança, mas não retornou o código Pix. Verifique os logs do servidor."
         );
       }
 
       return {
-        qrCode: qrCode || copyPaste,
-        copyPaste: copyPaste || qrCode,
+        // Always EMV string for QRCodeSVG + copy-paste
+        qrCode: emv,
+        copyPaste: emv,
+        qrImageBase64: qrImageBase64,
         transactionId: tx.id,
         providerId,
         amount: data.amount,

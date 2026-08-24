@@ -141,3 +141,34 @@ html.layout-compact .p-8 { padding: 1rem !important; }
 html.layout-compact .gap-6 { gap: 0.75rem !important; }
 html.layout-compact .text-xl { font-size: 1.05rem !important; }
 html.layout-compact .text-2xl { font-size: 1.2rem !important; }
+
+/* Mobile + compact: botões e alvos de toque menores */
+html.layout-compact button,
+html.layout-compact .btn,
+html.layout-compact [data-slot="button"] {
+  min-height: 2.5rem !important;
+}
+html.layout-compact .h-11 { height: 2.25rem !important; }
+html.layout-compact .h-12 { height: 2.5rem !important; }
+html.layout-compact .h-14 { height: 2.5rem !important; }
+html.layout-compact .py-4 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+html.layout-compact .py-6 { padding-top: 0.75rem !important; padding-bottom: 0.75rem !important; }
+html.layout-compact .px-10 { padding-left: 1.25rem !important; padding-right: 1.25rem !important; }
+html.layout-compact .rounded-2xl { border-radius: 0.75rem !important; }
+html.layout-compact .rounded-\[2rem\],
+html.layout-compact .rounded-\[2\.5rem\] { border-radius: 1rem !important; }
+html.layout-compact .text-4xl { font-size: 1.5rem !important; line-height: 1.15 !important; }
+html.layout-compact .text-3xl { font-size: 1.35rem !important; }
+
+@media (max-width: 768px) {
+  button, [data-slot="button"] {
+    min-height: 2.5rem;
+  }
+  .h-14 { height: 2.75rem !important; }
+  .h-12 { height: 2.5rem !important; }
+  .py-4 { padding-top: 0.55rem !important; padding-bottom: 0.55rem !important; }
+  .text-4xl { font-size: 1.65rem !important; }
+  .text-3xl { font-size: 1.4rem !important; }
+  .rounded-\[2rem\], .rounded-\[2\.5rem\] { border-radius: 1.1rem !important; }
+}
+
