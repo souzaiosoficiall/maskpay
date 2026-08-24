@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   clearAuthStorage,
-  clearSecurityLock,
   enforceSecurityLock,
   isSecurityLocked,
 } from '@/lib/security-lock';
@@ -19,58 +18,47 @@ async function hardSignOut() {
 }
 
 /**
- * Client-side inspection deterrent.
+ * Inspection deterrent — ONLY on explicit shortcuts (F12, Ctrl+Shift+I, etc.).
  *
- * On detect:
- * 1. Sets a durable security lock in localStorage
- * 2. Wipes auth tokens
- * 3. Navigates to YouTube
+ * Important: we do NOT use window-size or debugger polling.
+ * Those caused false positives on normal desktop browsers (black screen).
  *
- * On any later return (Back / bfcache / reopen):
- * if the lock is set → force logout and send user to homepage.
- * Lock is only cleared after a fresh password login.
+ * After a trigger:
+ * - auth is wiped
+ * - security lock is set (blocks auto-login until password login)
+ * - user is sent to YouTube
+ *
+ * Returning via Back lands on the public site logged-out (no black overlay).
  */
 export function DevToolsDetector() {
-  const [isDetected, setIsDetected] = useState(false);
   const triggeredRef = useRef(false);
 
   useEffect(() => {
-    // If user came back via Back button with lock still set, kick them out immediately
-    const kickIfLocked = async () => {
+    // If lock is active: log the user out silently, never paint a black screen.
+    // Auto-login is blocked until a real password login clears the lock.
+    const applyLockQuietly = async () => {
       if (!isSecurityLocked()) return;
-      triggeredRef.current = true;
-      setIsDetected(true);
       await hardSignOut();
-      // Stay locked — only successful login clears it
-      try {
-        document.documentElement.style.visibility = 'hidden';
-      } catch {
-        // ignore
-      }
-      const path = window.location.pathname;
-      if (path !== '/' && !path.startsWith('/auth')) {
+      const path = window.location.pathname || '/';
+      const isPublic =
+        path === '/' ||
+        path.startsWith('/auth') ||
+        path.startsWith('/blog') ||
+        path.startsWith('/docs') ||
+        path.startsWith('/legal');
+      if (!isPublic) {
         window.location.replace('/');
-      } else {
-        try {
-          document.documentElement.style.visibility = '';
-        } catch {
-          // ignore
-        }
       }
     };
 
-    // Run on mount (covers Back from YouTube → restored app page)
-    kickIfLocked();
+    applyLockQuietly();
 
-    // bfcache restore
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted || isSecurityLocked()) {
-        kickIfLocked();
-      }
+    const onPageShow = () => {
+      applyLockQuietly();
     };
     window.addEventListener('pageshow', onPageShow);
 
-    // Allow local development tooling
+    // Dev environment: no protection
     if (import.meta.env.DEV) {
       return () => window.removeEventListener('pageshow', onPageShow);
     }
@@ -78,24 +66,12 @@ export function DevToolsDetector() {
     const triggerProtection = () => {
       if (triggeredRef.current) return;
       triggeredRef.current = true;
-      setIsDetected(true);
 
-      // Lock + wipe BEFORE leaving — survives Back
       enforceSecurityLock();
       hardSignOut();
 
       try {
-        document.documentElement.style.visibility = 'hidden';
-        document.body.style.visibility = 'hidden';
-      } catch {
-        // ignore
-      }
-
-      // Nuke in-tab history so Back cannot land on an authenticated route
-      try {
-        const home = window.location.origin + '/';
-        window.history.replaceState(null, '', home);
-        // Push a disposable entry then replace with YouTube via location
+        window.history.replaceState(null, '', '/');
       } catch {
         // ignore
       }
@@ -106,7 +82,11 @@ export function DevToolsDetector() {
         try {
           window.location.href = YOUTUBE_URL;
         } catch {
-          window.open(YOUTUBE_URL, '_self');
+          try {
+            window.open(YOUTUBE_URL, '_self');
+          } catch {
+            // ignore
+          }
         }
       }
     };
@@ -136,63 +116,18 @@ export function DevToolsDetector() {
       }
     };
 
-    const checkDimensions = () => {
-      const threshold = 140;
-      const widthDiff = window.outerWidth - window.innerWidth > threshold;
-      const heightDiff = window.outerHeight - window.innerHeight > threshold;
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent
-      );
-      if (!isMobile && (widthDiff || heightDiff)) {
-        triggerProtection();
-        return true;
-      }
-      return false;
-    };
-
-    const checkDebugger = () => {
-      const start = performance.now();
-      // eslint-disable-next-line no-debugger
-      debugger;
-      if (performance.now() - start > 100) {
-        triggerProtection();
-        return true;
-      }
-      return false;
-    };
-
-    const detect = () => {
-      if (triggeredRef.current) return;
-      if (checkDimensions()) return;
-      if (checkDebugger()) return;
-    };
-
-    const interval = window.setInterval(detect, 800);
-    detect();
-
     window.addEventListener('contextmenu', handleContextMenu, true);
     window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('resize', checkDimensions);
 
     return () => {
-      window.clearInterval(interval);
       window.removeEventListener('contextmenu', handleContextMenu, true);
       window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('resize', checkDimensions);
       window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
 
-  if (!isDetected) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[999999] bg-black"
-      style={{ visibility: 'visible' }}
-      aria-hidden
-    />
-  );
+  // Never render a blocking black overlay — that was freezing the PC view.
+  return null;
 }
 
-/** Call after successful password login so the user can use the app again. */
-export { clearSecurityLock };
+export { clearSecurityLock } from '@/lib/security-lock';
