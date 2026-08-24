@@ -26,6 +26,7 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import maskPlatformAsset from "@/lib/mask-asset";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { supabase } from '@/integrations/supabase/client';
 
 export default function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -196,7 +197,15 @@ export default function DashboardLayout() {
             "w-full justify-start text-destructive/50 hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 transition-all group rounded-2xl", 
             (!isSidebarOpen && !isMobile) && "px-0 justify-center"
           )}
-          onClick={() => navigate({ to: '/' })}
+          onClick={async () => {
+            try {
+              window.localStorage.removeItem('maskpay-login-timestamp');
+              await supabase.auth.signOut();
+            } catch {
+              // ignore
+            }
+            window.location.href = '/auth?mode=login';
+          }}
         >
           <LogOut className="h-5 w-5 min-w-5" />
           {(isSidebarOpen || isMobile) && <span className="ml-3 text-xs font-black uppercase tracking-widest">Sair</span>}

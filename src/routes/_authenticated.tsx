@@ -29,15 +29,16 @@ function AuthenticatedLayout() {
     if (!sessionReady) return;
     
     // Update server-side access time
-    doUpdateLastAccess({});
+    doUpdateLastAccess({}).catch(() => undefined);
     
-    // Update client-side local session expiry logic
-    const lastLogin = window.localStorage.getItem('maskpay-login-timestamp');
+    // 24h inactivity: if the user closed the app and does not return within 24h,
+    // force logout. Closing the tab alone keeps the session (localStorage).
+    const lastAccess = window.localStorage.getItem('maskpay-login-timestamp');
     const now = Date.now();
     const twentyFourHours = 24 * 60 * 60 * 1000;
 
-    if (lastLogin && (now - parseInt(lastLogin)) > twentyFourHours) {
-      console.log("[AuthenticatedLayout] Session expired (>24h). Logging out.");
+    if (lastAccess && (now - parseInt(lastAccess, 10)) > twentyFourHours) {
+      console.log("[AuthenticatedLayout] Session expired (>24h inactivity). Logging out.");
       supabase.auth.signOut().then(() => {
         window.localStorage.removeItem('maskpay-login-timestamp');
         window.location.href = '/auth?mode=login';
@@ -45,7 +46,7 @@ function AuthenticatedLayout() {
       return;
     }
 
-    // Update the timestamp on every active access
+    // Refresh last-access timestamp on every authenticated navigation
     window.localStorage.setItem('maskpay-login-timestamp', now.toString());
   }, [sessionReady, location.pathname, doUpdateLastAccess]);
 
@@ -64,10 +65,13 @@ function AuthenticatedLayout() {
     // Se o perfil existe mas não é admin, verifica se a conta está verificada
     if (profile.role !== 'admin') {
       const isVerified = profile.verification_status === 'verified';
-      const isPending = profile.verification_status === 'pending' || profile.verification_status === 'pending_review';
+      // pending_review = documentos já enviados. "unverified" still needs /verify.
+      const alreadySubmitted =
+        profile.verification_status === 'pending' ||
+        profile.verification_status === 'pending_review';
       
       // Permitir acesso APENAS a rotas essenciais se não estiver verificado
-      const allowedPaths = ['/dashboard', '/support', '/verify'];
+      const allowedPaths = ['/dashboard', '/support', '/verify', '/settings'];
       const currentPath = location.pathname;
       
       const isAllowed = allowedPaths.some(path => currentPath === path || currentPath.startsWith(path + '/'));
@@ -79,8 +83,9 @@ function AuthenticatedLayout() {
         return;
       }
 
-      // Se já enviou documentos (pending), não pode acessar /verify de novo
-      if (isPending && currentPath.startsWith('/verify')) {
+      // Só bloqueia /verify quando os documentos JÁ foram enviados (em análise).
+      // Usuário com verification_status = unverified deve conseguir abrir o formulário.
+      if (alreadySubmitted && currentPath.startsWith('/verify')) {
         console.log(`[AuthenticatedLayout] Verification already pending. Redirecting to dashboard.`);
         navigate({ to: '/dashboard', replace: true });
         return;
