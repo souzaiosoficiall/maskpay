@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { User, Building2, ArrowRight, Eye, EyeOff, Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import maskPlatformAsset from "@/lib/mask-asset";
+import { AuthVisualPanel } from '@/components/AuthVisualPanel';
 import { useServerFn } from '@tanstack/react-start';
 import { validateCPFAction } from '@/lib/identity.functions';
 
@@ -286,13 +287,15 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 relative overflow-x-hidden font-sans text-foreground pb-[env(safe-area-inset-bottom)] w-full">
-      {/* Background Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none opacity-10">
-        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/20 blur-[150px] rounded-full"></div>
-      </div>
+    <div className="min-h-screen flex w-full bg-background font-sans text-foreground overflow-x-hidden">
+      {/* Form side */}
+      <div className="relative flex min-h-screen w-full flex-col items-center justify-center p-4 pb-[env(safe-area-inset-bottom)] lg:w-1/2">
+        {/* Background Glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none opacity-10">
+          <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/20 blur-[150px] rounded-full"></div>
+        </div>
 
-      <div className="w-full max-w-md space-y-6 md:space-y-8 relative z-10 pt-[env(safe-area-inset-top)] px-2">
+        <div className="w-full max-w-md space-y-6 md:space-y-8 relative z-10 pt-[env(safe-area-inset-top)] px-2">
         <div className="flex flex-col items-center">
           <Link to="/" className="flex items-center gap-3 mb-6 md:mb-10 transition-transform hover:scale-105">
             <img src={maskPlatformAsset.url} alt="MaskPay" className="w-10 h-10 md:w-12 md:h-12 object-contain" />
@@ -636,6 +639,12 @@ function AuthPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
+      </div>
+
+      {/* Desktop visual panel */}
+      <div className="hidden lg:block lg:w-1/2 lg:min-h-screen border-l border-white/5">
+        <AuthVisualPanel />
       </div>
     </div>
   );
