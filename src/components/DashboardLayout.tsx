@@ -226,53 +226,55 @@ export default function DashboardLayout() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        <header className="bg-card/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 shrink-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)", height: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}>
-          <div className="flex items-center gap-4">
-            {/* Desktop Toggle */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
+        <header
+          className="bg-background border-b border-white/5 flex items-center px-4 md:px-6 sticky top-0 z-40 shrink-0 relative"
+          style={{
+            paddingTop: "env(safe-area-inset-top, 0px)",
+            height: "calc(3.5rem + env(safe-area-inset-top, 0px))",
+            // Continua o preto da plataforma sob a status bar / Dynamic Island
+            backgroundColor: "#000000",
+          }}
+        >
+          {/* Esquerda: só o menu (mobile + desktop) */}
+          <div className="flex items-center z-10">
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="hidden lg:flex text-muted-foreground/60 hover:text-white rounded-xl"
             >
               <Menu className="h-5 w-5" />
             </Button>
-            
-            {/* Mobile Drawer Trigger */}
+
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="lg:hidden text-muted-foreground/60 hover:text-white rounded-xl"
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-72 border-white/5 bg-card" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+              <SheetContent
+                side="left"
+                className="p-0 w-72 border-white/5 bg-background"
+                style={{ paddingTop: "env(safe-area-inset-top, 0px)", backgroundColor: "#000000" }}
+              >
                 <SidebarContent isMobile />
               </SheetContent>
             </Sheet>
+          </div>
 
-            <img src={maskPlatformAsset.url} alt="MaskPay" className="w-8 h-8 object-contain lg:hidden" />
+          {/* Centro: MaskPay (sem "|") — mobile e PC */}
+          <div className="absolute inset-x-0 flex items-center justify-center pointer-events-none" style={{ top: "env(safe-area-inset-top, 0px)", bottom: 0 }}>
+            <span className="text-sm md:text-base font-black tracking-[0.2em] uppercase text-white">
+              MaskPay
+            </span>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4 pl-4 border-l border-white/10">
-              <div className="text-right hidden sm:block">
-                <p className="text-[10px] font-black uppercase tracking-widest text-white leading-none mb-1">{profile?.full_name || ''}</p>
-                <div className="flex items-center justify-end gap-1.5">
-                   <div className={cn("w-1 h-1 rounded-full", profile?.verification_status === 'verified' ? "bg-green-500" : "bg-yellow-500")} />
-                   <p className="text-[8px] text-muted-foreground/40 uppercase tracking-tighter font-bold">
-                    {profile?.verification_status === 'verified' ? 'Verificado' : 'Aguardando'}
-                  </p>
-                </div>
-              </div>
-              <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 p-1 group">
-                <img src={maskPlatformAsset.url} alt="Avatar" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
-              </div>
-            </div>
-          </div>
+
+          {/* Direita vazia (avatar removido) — equilibra o layout */}
+          <div className="ml-auto w-9 h-9" aria-hidden />
         </header>
 
         <main className="flex-1 overflow-y-auto bg-background/50 custom-scrollbar">
