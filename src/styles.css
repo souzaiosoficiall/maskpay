@@ -176,19 +176,15 @@ html, body {
     padding-right: env(safe-area-inset-right);
   }
 }
-/* Fundo preto só sob o status bar em PWA standalone (sem empurrar o layout) */
+/* Tela cheia no mobile/PWA: fundo preto contínuo sob a status bar / Dynamic Island */
+html, body, #root {
+  background-color: #000 !important;
+  min-height: 100%;
+  min-height: 100dvh;
+}
 @media (display-mode: standalone) {
-  @supports (padding: env(safe-area-inset-top)) {
-    body::before {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: env(safe-area-inset-top);
-      background: #000;
-      z-index: 40;
-      pointer-events: none;
-    }
+  html, body {
+    /* edge-to-edge: sem padding no topo (conteúdo sob a ilha) */
+    padding-top: 0 !important;
   }
 }
