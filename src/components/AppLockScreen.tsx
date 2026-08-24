@@ -41,7 +41,6 @@ async function isPlatformAuthAvailable(): Promise<boolean> {
 async function authenticateWithBiometrics(): Promise<{ ok: boolean; reason?: string }> {
   const available = await isPlatformAuthAvailable();
   if (!available) {
-    // No platform authenticator — unlock so the user is not stuck.
     return { ok: true, reason: "unsupported" };
   }
 
@@ -71,7 +70,6 @@ async function authenticateWithBiometrics(): Promise<{ ok: boolean; reason?: str
       return { ok: true };
     }
 
-    // First time: create a platform credential (Face ID / Touch ID / Windows Hello)
     const userId = new Uint8Array(16);
     crypto.getRandomValues(userId);
 
@@ -103,11 +101,9 @@ async function authenticateWithBiometrics(): Promise<{ ok: boolean; reason?: str
     return { ok: true };
   } catch (err: any) {
     const name = err?.name || "";
-    // User cancelled Face ID / system dialog
     if (name === "NotAllowedError" || name === "AbortError") {
       return { ok: false, reason: "cancelled" };
     }
-    // No authenticator / invalid state — soft unlock so app remains usable
     console.warn("[AppLock] WebAuthn fallback:", err);
     return { ok: true, reason: "fallback" };
   }
@@ -182,54 +178,58 @@ export function AppLockScreen({ onUnlocked }: AppLockScreenProps) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#f8f5ff] text-foreground select-none">
-      {/* Soft gradient background matching reference */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f3eaff] via-[#faf8ff] to-white" />
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black text-white select-none overflow-hidden">
+      {/* Subtle glow */}
+      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-white/[0.03] blur-[120px] rounded-full" />
 
-      <div className="relative z-10 flex w-full max-w-sm flex-col items-center px-8">
+      <div className="relative z-10 flex w-full max-w-sm flex-col items-center px-8 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {/* Logo + name */}
-        <div className="mb-14 flex items-center gap-2.5">
+        <div className="mb-16 flex items-center gap-3">
           <img
             src={maskPlatformAsset.url}
             alt="MaskPay"
-            className="h-9 w-9 object-contain"
+            className="h-10 w-10 object-contain"
           />
-          <span className="text-[1.65rem] font-black tracking-tight text-[#6d28d9]">
+          <span className="text-2xl font-black tracking-tighter uppercase">
             MaskPay
           </span>
         </div>
 
         {/* Face ID icon */}
-        <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-full bg-[#ede9fe]">
-          <ScanFace className="h-10 w-10 text-[#7c3aed]" strokeWidth={1.5} />
+        <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-full bg-white/5 border border-white/10">
+          <ScanFace className="h-10 w-10 text-white" strokeWidth={1.5} />
         </div>
 
-        <h1 className="mb-2 text-center text-2xl font-bold tracking-tight text-zinc-900">
+        <h1 className="mb-2 text-center text-2xl font-black tracking-tight uppercase">
           App bloqueado
         </h1>
-        <p className="mb-10 max-w-[260px] text-center text-sm leading-relaxed text-zinc-500">
+        <p className="mb-12 max-w-[280px] text-center text-sm leading-relaxed text-white/40 font-medium">
           Confirme com Face ID para voltar à sua conta.
         </p>
 
-        {/* Primary unlock button */}
+        {/* Primary unlock button — white on black, platform style */}
         <button
           type="button"
           onClick={handleUnlock}
           disabled={loading}
           className={cn(
-            "flex h-14 w-full items-center justify-center rounded-full bg-[#a78bfa] text-white shadow-lg shadow-purple-300/40 transition-all active:scale-[0.98]",
-            "hover:bg-[#8b5cf6] disabled:opacity-80"
+            "flex h-14 w-full items-center justify-center rounded-full bg-white text-black",
+            "text-sm font-black uppercase tracking-widest",
+            "shadow-xl shadow-white/5 transition-all active:scale-[0.98]",
+            "hover:bg-white/90 disabled:opacity-70"
           )}
         >
           {loading ? (
             <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
-            <span className="text-sm font-bold tracking-wide">Desbloquear</span>
+            "Desbloquear"
           )}
         </button>
 
         {error && (
-          <p className="mt-4 text-center text-xs font-medium text-red-500">{error}</p>
+          <p className="mt-4 text-center text-[10px] font-bold uppercase tracking-wider text-red-400">
+            {error}
+          </p>
         )}
 
         {/* Logout link */}
@@ -237,7 +237,7 @@ export function AppLockScreen({ onUnlocked }: AppLockScreenProps) {
           type="button"
           onClick={handleLogout}
           disabled={loading}
-          className="mt-6 text-sm font-medium text-[#7c3aed] underline-offset-4 hover:underline disabled:opacity-50"
+          className="mt-8 text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors disabled:opacity-50"
         >
           Sair da conta
         </button>
