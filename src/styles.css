@@ -176,17 +176,19 @@ html, body {
     padding-right: env(safe-area-inset-right);
   }
 }
-/* Garante fundo preto atrás do status bar / notch */
-@supports (padding: env(safe-area-inset-top)) {
-  body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: env(safe-area-inset-top);
-    background: #000;
-    z-index: 9999;
-    pointer-events: none;
+/* Fundo preto só sob o status bar em PWA standalone (sem empurrar o layout) */
+@media (display-mode: standalone) {
+  @supports (padding: env(safe-area-inset-top)) {
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: env(safe-area-inset-top);
+      background: #000;
+      z-index: 40;
+      pointer-events: none;
+    }
   }
 }

@@ -29,7 +29,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpenTickets, handleLogout }: { isMobile?: boolean, isSidebarOpen: boolean, hasPendingKyc: boolean, hasOpenTickets: boolean, handleLogout: () => void }) {
   return (
     <div className="flex flex-col h-full bg-card">
-      <div className="h-16 flex items-center px-6 border-b border-white/5 shrink-0 pt-[env(safe-area-inset-top)]" style={{ minHeight: "calc(4rem + env(safe-area-inset-top, 0px))" }}>
+      <div className="flex items-center px-6 border-b border-white/5 shrink-0 h-14 md:h-16">
         <Link to="/admin" className="flex items-center gap-3 overflow-hidden">
           <img src={maskPlatformAsset.url} alt="MaskPay Admin" className={cn("object-contain transition-all", (isSidebarOpen || isMobile) ? "w-8 h-8 min-w-8" : "w-6 h-6 min-w-6")} />
           {(isSidebarOpen || isMobile) && (
@@ -321,7 +321,7 @@ export default function AdminLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        <header className="h-16 pt-[env(safe-area-inset-top)] bg-card/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 shrink-0" style={{ height: "calc(4rem + env(safe-area-inset-top, 0px))" }}>
+        <header className="bg-card/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 shrink-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)", height: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}>
           <div className="flex items-center gap-4">
             <Button 
               variant="ghost" 

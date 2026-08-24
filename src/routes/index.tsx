@@ -254,7 +254,7 @@ function LandingPage() {
 
 
       {/* Navigation */}
-      <div className="fixed top-20 md:top-6 left-0 right-0 z-50 flex justify-center px-6 pointer-events-none pt-[env(safe-area-inset-top)]">
+      <div className="fixed left-0 right-0 z-50 flex justify-center px-4 md:px-6 pointer-events-none" style={{ top: "max(0.35rem, env(safe-area-inset-top, 0px))" }}>
         <header className="w-full max-w-5xl h-20 flex items-center justify-between px-8 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-full pointer-events-auto">
           <div className="flex-1 md:flex-none flex items-center justify-center md:justify-start">
             <Link to="/" className="flex items-center gap-3">
@@ -304,7 +304,7 @@ function LandingPage() {
         </header>
       </div>
 
-      <main className="flex-1 pt-20">
+      <main className="flex-1 pt-24 md:pt-28">
         {/* Mobile Register Button - Sticky Footer */}
         <div className="md:hidden fixed bottom-6 left-0 right-0 z-50 flex justify-center px-6 pointer-events-none">
           <Button size="lg" className="w-full max-w-sm rounded-full bg-primary text-primary-foreground font-black transition-all uppercase tracking-[0.2em] text-[10px] h-14 shadow-2xl shadow-primary/20 pointer-events-auto border-none" asChild>
