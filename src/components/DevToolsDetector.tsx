@@ -3,12 +3,54 @@ import { useEffect, useRef, useState } from 'react';
 const YOUTUBE_URL = 'https://www.youtube.com/watch?v=kYJjYy_PmqA';
 
 /**
+ * Wipe local auth so browser "Back" after the YouTube redirect
+ * cannot restore a logged-in session.
+ */
+function clearAuthState() {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      const lower = key.toLowerCase();
+      if (
+        lower.includes('supabase') ||
+        lower.includes('auth') ||
+        lower.includes('maskpay') ||
+        lower.includes('sb-')
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
+
+  try {
+    sessionStorage.clear();
+  } catch {
+    // ignore
+  }
+
+  // Best-effort sign out via Supabase client (dynamic import to avoid circular deps)
+  try {
+    import('@/integrations/supabase/client')
+      .then(({ supabase }) => supabase.auth.signOut({ scope: 'local' }))
+      .catch(() => undefined);
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Client-side inspection deterrent.
- * When DevTools / inspection is detected, covers the UI and forces
- * navigation to the configured YouTube video immediately.
+ * When DevTools / inspection is detected:
+ * 1. Clears any persisted login session
+ * 2. Covers the UI (no icons)
+ * 3. Forces navigation to the configured YouTube video
  *
- * Note: this is not true security — anything in the browser can be bypassed.
- * It raises the bar for casual inspection only.
+ * Clearing auth prevents "Back" from landing inside a logged-in account.
  */
 export function DevToolsDetector() {
   const [isDetected, setIsDetected] = useState(false);
@@ -23,16 +65,25 @@ export function DevToolsDetector() {
       triggeredRef.current = true;
       setIsDetected(true);
 
+      // CRITICAL: destroy session before leaving so Back cannot restore the app logged-in
+      clearAuthState();
+
       // Hide page content immediately (no icons / UI visible)
       try {
         document.documentElement.style.visibility = 'hidden';
         document.body.style.visibility = 'hidden';
-        document.body.innerHTML = '';
       } catch {
         // ignore
       }
 
-      // Force navigate to YouTube (more reliable than window.open which is often blocked)
+      // Replace current history entry so Back does not return to the form mid-session
+      try {
+        window.history.replaceState(null, '', '/');
+      } catch {
+        // ignore
+      }
+
+      // Force navigate to YouTube
       try {
         window.location.replace(YOUTUBE_URL);
       } catch {
@@ -48,14 +99,12 @@ export function DevToolsDetector() {
       }
     };
 
-    // Block context menu
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       return false;
     };
 
-    // Block common inspection shortcuts (Windows / Linux / Mac)
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key?.toLowerCase?.() || '';
       const isF12 = e.key === 'F12' || e.code === 'F12';
@@ -75,7 +124,6 @@ export function DevToolsDetector() {
       }
     };
 
-    // Dimension-based detection (docked DevTools)
     const checkDimensions = () => {
       const threshold = 140;
       const widthDiff = window.outerWidth - window.innerWidth > threshold;
@@ -90,7 +138,6 @@ export function DevToolsDetector() {
       return false;
     };
 
-    // debugger timing detection
     const checkDebugger = () => {
       const start = performance.now();
       // eslint-disable-next-line no-debugger
@@ -102,71 +149,44 @@ export function DevToolsDetector() {
       return false;
     };
 
-    // console firebug / toString tricks (legacy but still useful)
-    const checkConsole = () => {
-      try {
-        const el = new Image();
-        Object.defineProperty(el, 'id', {
-          get: function () {
-            triggerProtection();
-            return '';
-          },
-        });
-        // This may invoke the getter when DevTools is open and logging
-        // eslint-disable-next-line no-console
-        console.log('%c', el as any);
-      } catch {
-        // ignore
-      }
-    };
-
     const detect = () => {
       if (triggeredRef.current) return;
       if (checkDimensions()) return;
       if (checkDebugger()) return;
-      checkConsole();
     };
 
-    // Faster polling so opening DevTools is caught quickly
     const interval = window.setInterval(detect, 800);
-    // Run once immediately
     detect();
 
     window.addEventListener('contextmenu', handleContextMenu, true);
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('resize', checkDimensions);
 
-    // Also watch for visibility of firebug-like elements
-    let observer: MutationObserver | null = null;
-    try {
-      observer = new MutationObserver(() => {
-        if (triggeredRef.current) return;
-        // Some extensions inject elements when inspecting
-        if (document.getElementById('__vue-devtools-root') || document.getElementById('react-devtools-root')) {
-          triggerProtection();
+    // If user returns via Back/forward cache with DevTools still open, re-check
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        // Coming from bfcache — ensure we are not authenticated if protection already fired
+        if (triggeredRef.current) {
+          clearAuthState();
+          window.location.replace('/');
+        } else {
+          detect();
         }
-      });
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-    } catch {
-      // ignore
-    }
+      }
+    };
+    window.addEventListener('pageshow', onPageShow);
 
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('contextmenu', handleContextMenu, true);
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('resize', checkDimensions);
-      try {
-        observer?.disconnect();
-      } catch {
-        // ignore
-      }
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
 
   if (!isDetected) return null;
 
-  // Pure black overlay — no icons, no UI chrome
   return (
     <div
       className="fixed inset-0 z-[999999] bg-black"
