@@ -22,7 +22,7 @@ interface UserManagementProps {
   users: any[];
   isLoading: boolean;
   onUpdateStatus: (data: { userId: string, status: 'active' | 'blocked' | 'rejected' }) => void;
-  onUpdateBalance: (data: { userId: string, amount: number, type: 'add', description: string }) => void;
+  onUpdateBalance: (data: { userId: string, amount: number, type: 'add' | 'set', description: string }) => void;
   onUpdateRoute: (data: { userId: string, route: 'BLACK' | 'WHITE' }) => void;
   onResetPassword: (userId: string) => void;
   onDeleteUser: (userId: string) => void;
@@ -282,23 +282,54 @@ export function UserManagement({
 
                   <div className="pt-6 border-t border-white/5">
                     <Label className="text-[9px] font-black uppercase text-muted-foreground/40 tracking-widest block mb-4">Ajuste de Saldo</Label>
+                    <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-3">
+                      Use <span className="text-white/60">Definir</span> para colocar o valor exato (ex: 0,00 zera). Use <span className="text-white/60">Add</span> para somar ao saldo atual.
+                    </p>
                     <div className="flex gap-2">
                       <input 
-                        type="number" 
+                        type="text"
+                        inputMode="decimal"
                         id="balance-amount"
-                        placeholder="VALOR..."
+                        placeholder="0,00"
                         className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-white/20"
                       />
                       <Button 
                         onClick={() => {
                           const input = document.getElementById('balance-amount') as HTMLInputElement;
-                          const amount = parseFloat(input.value);
-                          if (!isNaN(amount)) {
-                            onUpdateBalance({ userId: selectedUser.id, amount, type: 'add', description: 'Ajuste administrativo' });
-                            input.value = '';
-                          }
+                          // Accept "0", "0,00", "0.00" — never treat zero as empty
+                          const raw = (input.value || '').trim().replace(/\s/g, '').replace(',', '.');
+                          if (raw === '') return;
+                          const amount = Number(raw);
+                          if (Number.isNaN(amount)) return;
+                          onUpdateBalance({
+                            userId: selectedUser.id,
+                            amount,
+                            type: 'set',
+                            description: 'Definição administrativa de saldo',
+                          });
+                          input.value = '';
                         }}
                         className="bg-white text-black hover:bg-white/90 rounded-xl h-10 px-4 font-black uppercase text-[9px]"
+                      >
+                        Definir
+                      </Button>
+                      <Button 
+                        onClick={() => {
+                          const input = document.getElementById('balance-amount') as HTMLInputElement;
+                          const raw = (input.value || '').trim().replace(/\s/g, '').replace(',', '.');
+                          if (raw === '') return;
+                          const amount = Number(raw);
+                          if (Number.isNaN(amount)) return;
+                          onUpdateBalance({
+                            userId: selectedUser.id,
+                            amount,
+                            type: 'add',
+                            description: 'Ajuste administrativo',
+                          });
+                          input.value = '';
+                        }}
+                        variant="outline"
+                        className="border-white/10 bg-white/5 text-white hover:bg-white/10 rounded-xl h-10 px-4 font-black uppercase text-[9px]"
                       >
                         Add
                       </Button>

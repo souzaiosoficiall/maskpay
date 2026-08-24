@@ -166,7 +166,16 @@ export const updateBalance = createServerFn({ method: "POST" })
 
     if (walletError) throw new Error(walletError.message);
 
-    const newBalance = data.type === 'add' ? (wallet.balance || 0) + data.amount : data.amount;
+    const current = Number(wallet.balance) || 0;
+    // 'set' replaces balance (including 0.00 to zero out). 'add' increments.
+    const newBalance =
+      data.type === 'add'
+        ? current + Number(data.amount)
+        : Number(data.amount);
+
+    if (Number.isNaN(newBalance)) {
+      throw new Error('Valor de saldo inválido');
+    }
 
     const { error } = await supabaseAdmin
       .from('wallets')
