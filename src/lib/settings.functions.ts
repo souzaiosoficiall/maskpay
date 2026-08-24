@@ -246,7 +246,7 @@ export const updateTransactionPassword = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
 
     // In a real app, we would hash this. For this demo, we store it in profiles.
-    // Note: Lovable Cloud supports pgcrypto for hashing if needed.
+    // Note: use pgcrypto for hashing if needed.
     const { error } = await supabase
       .from('profiles')
       .update({ transaction_password_hash: data.newPassword })

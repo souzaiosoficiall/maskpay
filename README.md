@@ -1,29 +1,25 @@
-# Welcome to your Lovable project
+# MaskPay
 
-This project was built with [Lovable](https://lovable.dev).
+Infraestrutura de pagamentos — PWA com PIX, carteira, API keys, webhooks e notificações push.
 
-## Build with Lovable
+## Stack
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+- TanStack Start / React
+- Supabase (Auth + Postgres + Storage)
+- Vercel (deploy)
+- EvoPay (adquirente PIX)
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+## Desenvolvimento
 
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```bash
+npm install
 npm run dev
 ```
 
-## Built with
+Configure as variáveis de ambiente (`.env` / Vercel): Supabase, EvoPay, VAPID.
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+## Produção
+
+Deploy na Vercel com as env de produção. Webhook PIX:
+
+`https://seu-dominio/api/public/payment-webhook`

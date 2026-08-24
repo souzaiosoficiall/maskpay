@@ -26,7 +26,7 @@ export const processTransaction = createServerFn({ method: "POST" })
     const admin = supabaseAdmin;
 
 
-    // Note: In Lovable Cloud, we should use context.supabase if authenticated.
+    // Note: Use context.supabase when authenticated.
     // For this prototype, we'll demonstrate the structure.
     
     const { walletId, type, amount, description, referenceId } = data;

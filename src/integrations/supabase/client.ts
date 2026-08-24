@@ -28,7 +28,7 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 /**
  * Always persist to localStorage synchronously so the session survives
- * closing the tab / PWA. The Lovable preview broker is only used as a
+ * closing the tab / PWA. The preview broker is only used as a
  * best-effort mirror when embedded in the editor iframe.
  */
 function createAuthStorage() {
@@ -81,7 +81,7 @@ function createSupabaseClient() {
       ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
     ];
     throw new Error(
-      `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`,
+      `Missing Supabase environment variable(s): ${missing.join(', ')}. Configure as variáveis SUPABASE_URL e SUPABASE_ANON_KEY / SERVICE_ROLE_KEY.`,
     );
   }
 

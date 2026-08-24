@@ -14,7 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
+import { reportRuntimeError } from "../lib/runtime-error-reporting";
 import maskPlatformAsset from "@/lib/mask-asset";
 import { Toaster } from "@/components/ui/sonner";
 import { DevToolsDetector } from "@/components/DevToolsDetector";
@@ -52,7 +52,7 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    reportRuntimeError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
   return (
