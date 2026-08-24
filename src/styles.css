@@ -166,7 +166,7 @@ html.layout-compact .text-3xl { font-size: 1.35rem !important; }
 
 /* PWA standalone: safe-area. Top fica no header (não no body) pra não criar "buraco" branco sob o Dynamic Island */
 html, body {
-  background-color: #000;
+  background-color: hsl(var(--background));
 }
 @media (display-mode: standalone) {
   body {
@@ -176,15 +176,14 @@ html, body {
     padding-right: env(safe-area-inset-right);
   }
 }
-/* Tela cheia no mobile/PWA: fundo preto contínuo sob a status bar / Dynamic Island */
+/* Tela cheia: cor de background da plataforma sob a Dynamic Island (sem recorte) */
 html, body, #root {
-  background-color: #000 !important;
+  background-color: hsl(var(--background)) !important;
   min-height: 100%;
   min-height: 100dvh;
 }
 @media (display-mode: standalone) {
   html, body {
-    /* edge-to-edge: sem padding no topo (conteúdo sob a ilha) */
     padding-top: 0 !important;
   }
 }

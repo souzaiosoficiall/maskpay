@@ -22,6 +22,14 @@ export function TicketAttachment({ url, className }: { url: string; className?: 
     setSignedUrl(null);
     setFailed(false);
 
+    // Já veio signed do servidor (admin/user via getTicketMessages)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      setSignedUrl(url);
+      return () => {
+        active = false;
+      };
+    }
+
     const path = extractPath(url);
 
     supabase.storage

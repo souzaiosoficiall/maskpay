@@ -182,7 +182,39 @@ export const getTicketMessages = createServerFn({ method: "POST" })
       .order('created_at', { ascending: true });
 
     if (error) throw new Error(error.message);
-    return messages ?? [];
+
+    const rows = messages ?? [];
+    // Bucket privado: gera signed URL no servidor (service role) para admin e usuário.
+    // Evita "Anexo indisponível" quando o admin não passa na policy do Storage.
+    const BUCKET = 'ticket-attachments';
+    const withUrls = await Promise.all(
+      rows.map(async (m: any) => {
+        const raw = m.attachment_path as string | null;
+        if (!raw) return m;
+        let path = raw;
+        if (raw.startsWith('http')) {
+          const marker = `/${BUCKET}/`;
+          const idx = raw.indexOf(marker);
+          if (idx !== -1) path = raw.slice(idx + marker.length).split('?')[0];
+        }
+        path = String(path).replace(/^\/+/, '');
+        try {
+          const { data: signed, error: signErr } = await supabaseAdmin.storage
+            .from(BUCKET)
+            .createSignedUrl(path, 60 * 60);
+          if (signErr || !signed?.signedUrl) {
+            console.error('[ticket] signed URL fail', path, signErr);
+            return m;
+          }
+          return { ...m, attachment_path: signed.signedUrl, attachment_signed: true };
+        } catch (e) {
+          console.error('[ticket] signed URL exception', e);
+          return m;
+        }
+      }),
+    );
+
+    return withUrls;
   });
 
 export const sendTicketMessage = createServerFn({ method: "POST" })
