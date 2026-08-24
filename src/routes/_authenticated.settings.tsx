@@ -28,7 +28,6 @@ function SettingsPage() {
   const doUpdateAccessPassword = useServerFn(updateAccessPassword);
   const doUpdateTransactionPassword = useServerFn(updateTransactionPassword);
 
-  
   const [compactLayout, setCompactLayout] = useState(false);
 
   useEffect(() => {
@@ -46,6 +45,7 @@ function SettingsPage() {
       document.documentElement.classList.toggle('layout-compact', on);
     } catch {}
   };
+
 
   const [activeSection, setActiveSection] = useState<'main' | 'security' | 'notifications'>('main');
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
@@ -195,7 +195,37 @@ function SettingsPage() {
               </div>
             </Card>
 
+
+            {/* Layout compacto — fica em Configurações (geral), não em Notificações */}
+            <Card className="border-white/5 bg-background border-2 rounded-[2.5rem] p-6 md:p-8">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1 min-w-0">
+                  <h3 className="text-lg font-black uppercase tracking-tighter">Layout compacto</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">
+                    Reduz botões, espaçamentos e tipografia — ideal para celular.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleCompactLayout(!compactLayout)}
+                  className={cn(
+                    "relative h-8 w-14 rounded-full transition-colors shrink-0",
+                    compactLayout ? "bg-white" : "bg-white/10"
+                  )}
+                  aria-label="Alternar layout compacto"
+                >
+                  <span
+                    className={cn(
+                      "absolute top-1 left-1 h-6 w-6 rounded-full transition-transform",
+                      compactLayout ? "translate-x-6 bg-black" : "translate-x-0 bg-white/80"
+                    )}
+                  />
+                </button>
+              </div>
+            </Card>
+
             {/* Notificações Menu Item */}
+
             <button 
               onClick={() => setActiveSection('notifications')}
               className="w-full text-left group"
@@ -255,35 +285,6 @@ function SettingsPage() {
               </Button>
             </div>
             
-            
-            {/* Layout compacto */}
-            <Card className="border-white/5 bg-background border-2 rounded-[2.5rem] p-6 md:p-8">
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-lg font-black uppercase tracking-tighter">Layout compacto</h3>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">
-                    Reduz botões, espaçamentos e tipografia — ideal para celular.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleCompactLayout(!compactLayout)}
-                  className={cn(
-                    "relative h-8 w-14 rounded-full transition-colors shrink-0",
-                    compactLayout ? "bg-white" : "bg-white/10"
-                  )}
-                  aria-label="Alternar layout compacto"
-                >
-                  <span
-                    className={cn(
-                      "absolute top-1 left-1 h-6 w-6 rounded-full bg-black transition-transform",
-                      compactLayout ? "translate-x-6 bg-black" : "translate-x-0 bg-white/80"
-                    )}
-                  />
-                </button>
-              </div>
-            </Card>
-
             <NotificationDiagnostics />
           </motion.div>
         ) : (

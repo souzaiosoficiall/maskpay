@@ -125,96 +125,19 @@
 }
 
 
-/* ---- iOS: inputs < 16px force zoom on focus ---- */
 @layer base {
-  input,
-  textarea,
-  select {
-    font-size: 16px !important;
-  }
+  input, textarea, select { font-size: 16px !important; }
   @media (min-width: 768px) {
-    input,
-    textarea,
-    select {
-      font-size: inherit;
-    }
+    input, textarea, select { font-size: inherit; }
   }
 }
 
-/* ---- Layout compacto (preferência do usuário) ---- */
-html.layout-compact {
-  --radius: 0.85rem;
-}
-
-html.layout-compact body {
-  font-size: 14px;
-}
-
-/* Smaller padding / buttons / cards on compact */
-html.layout-compact .rounded-\[2\.5rem\],
-html.layout-compact .rounded-\[2rem\],
-html.layout-compact .rounded-3xl {
-  border-radius: 1rem !important;
-}
-
-html.layout-compact .h-14 {
-  height: 2.75rem !important;
-}
-html.layout-compact .h-16 {
-  height: 3rem !important;
-}
-html.layout-compact .h-12 {
-  height: 2.5rem !important;
-}
-html.layout-compact .p-6 {
-  padding: 0.875rem !important;
-}
-html.layout-compact .p-8 {
-  padding: 1rem !important;
-}
-html.layout-compact .p-10 {
-  padding: 1.25rem !important;
-}
-html.layout-compact .gap-6 {
-  gap: 0.75rem !important;
-}
-html.layout-compact .gap-8 {
-  gap: 1rem !important;
-}
-html.layout-compact .mb-8 {
-  margin-bottom: 1rem !important;
-}
-html.layout-compact .mb-10 {
-  margin-bottom: 1.25rem !important;
-}
-html.layout-compact .py-6 {
-  padding-top: 0.75rem !important;
-  padding-bottom: 0.75rem !important;
-}
-html.layout-compact .text-xl {
-  font-size: 1.05rem !important;
-  line-height: 1.3 !important;
-}
-html.layout-compact .text-2xl {
-  font-size: 1.2rem !important;
-  line-height: 1.3 !important;
-}
-html.layout-compact .text-3xl {
-  font-size: 1.4rem !important;
-  line-height: 1.25 !important;
-}
-html.layout-compact .w-16.h-16 {
-  width: 2.75rem !important;
-  height: 2.75rem !important;
-}
-html.layout-compact .w-12.h-12 {
-  width: 2.25rem !important;
-  height: 2.25rem !important;
-}
-
-/* Mobile default: slightly tighter than desktop even without toggle */
-@media (max-width: 767px) {
-  body {
-    font-size: 14.5px;
-  }
-}
+html.layout-compact { --radius: 0.85rem; }
+html.layout-compact body { font-size: 14px; }
+html.layout-compact .h-14 { height: 2.75rem !important; }
+html.layout-compact .h-16 { height: 3rem !important; }
+html.layout-compact .p-6 { padding: 0.875rem !important; }
+html.layout-compact .p-8 { padding: 1rem !important; }
+html.layout-compact .gap-6 { gap: 0.75rem !important; }
+html.layout-compact .text-xl { font-size: 1.05rem !important; }
+html.layout-compact .text-2xl { font-size: 1.2rem !important; }
