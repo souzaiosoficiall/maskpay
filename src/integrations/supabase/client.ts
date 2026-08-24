@@ -49,8 +49,6 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
     },
     auth: {
-      // Production/PWA uses localStorage (broker falls back when not inside Lovable preview).
-      // Session survives tab close; app enforces 24h inactivity via maskpay-login-timestamp.
       storage: brokeredPreviewStorage(),
       persistSession: true,
       storageKey: 'maskpay-auth-session',

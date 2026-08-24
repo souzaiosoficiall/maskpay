@@ -201,9 +201,7 @@ export default function DashboardLayout() {
             try {
               window.localStorage.removeItem('maskpay-login-timestamp');
               await supabase.auth.signOut();
-            } catch {
-              // ignore
-            }
+            } catch {}
             window.location.href = '/auth?mode=login';
           }}
         >

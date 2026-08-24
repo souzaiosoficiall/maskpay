@@ -29,8 +29,7 @@ export const submitVerification = createServerFn({ method: "POST" })
 
     if (requestError) throw new Error(requestError.message);
 
-    // 2. Update profile KYC flags only — keep account status "active"
-    // so the user is not treated as blocked/rejected while under review.
+    // 2. Update KYC flags only — keep account status active
     const { error: profileError } = await (supabaseAdmin.from('profiles' as any) as any)
       .update({ 
         verification_status: 'pending_review',

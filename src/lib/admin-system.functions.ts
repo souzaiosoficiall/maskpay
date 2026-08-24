@@ -46,9 +46,7 @@ export const getAllUsers = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await ensureAdmin(context);
 
-    // Source of truth: profiles table (every registered user must have a row).
-    // Auth listUsers is only a fallback for metadata and is paginated (default 50),
-    // so it must never be the only source — that was hiding valid accounts.
+    // Source of truth: profiles (listUsers alone hid valid accounts).
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
@@ -59,7 +57,6 @@ export const getAllUsers = createServerFn({ method: "GET" })
       throw new Error(profilesError.message);
     }
 
-    // Optional enrichment from Auth (paginated). Failures must not hide profiles.
     const authById = new Map<string, any>();
     try {
       let page = 1;
@@ -69,17 +66,14 @@ export const getAllUsers = createServerFn({ method: "GET" })
           page,
           perPage,
         });
-        if (authError) {
-          console.error("Erro ao buscar usuários do Auth (página " + page + "):", authError);
-          break;
-        }
+        if (authError) break;
         const users = pageData?.users || [];
         for (const u of users) authById.set(u.id, u);
         if (users.length < perPage) break;
         page += 1;
       }
     } catch (err) {
-      console.error("Falha ao listar Auth users (seguindo só com profiles):", err);
+      console.error("Auth listUsers fallback failed:", err);
     }
 
     const data = (profiles || []).map((p: any) => {
@@ -87,11 +81,7 @@ export const getAllUsers = createServerFn({ method: "GET" })
       return {
         id: p.id,
         email: p.email || authUser?.email || 'N/A',
-        full_name:
-          p.full_name ||
-          authUser?.user_metadata?.['full_name'] ||
-          authUser?.user_metadata?.['name'] ||
-          'Usuário sem Nome',
+        full_name: p.full_name || authUser?.user_metadata?.['full_name'] || authUser?.user_metadata?.['name'] || 'Usuário sem Nome',
         document: p.document || authUser?.user_metadata?.['document'] || null,
         phone: p.phone || authUser?.user_metadata?.['phone'] || null,
         status: p.status || 'active',

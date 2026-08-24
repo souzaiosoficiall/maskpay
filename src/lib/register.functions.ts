@@ -12,12 +12,6 @@ const registerSchema = z.object({
   accountType: z.enum(["PF", "PJ"]),
 });
 
-/**
- * Server-side registration:
- * - Creates the Auth user with email already confirmed (no confirmation email).
- * - Upserts profile + wallet with service role (bypasses RLS).
- * - Returns success so the client can signInWithPassword and start a session.
- */
 export const registerUser = createServerFn({ method: "POST" })
   .validator((data: unknown) => registerSchema.parse(data))
   .handler(async ({ data: input }) => {
@@ -28,28 +22,13 @@ export const registerUser = createServerFn({ method: "POST" })
     const OWNER_EMAIL = "souzaiosoficial@gmail.com";
     const isOwner = email === OWNER_EMAIL.toLowerCase();
 
-    // Duplicate checks (profiles)
-    const { data: existing } = await supabaseAdmin
-      .from("profiles")
-      .select("id, email, document, phone")
-      .or(`email.eq.${email},document.eq.${document},phone.eq.${phone}`)
-      .limit(5);
+    const { data: byEmail } = await supabaseAdmin.from("profiles").select("id").eq("email", email).limit(1);
+    if (byEmail && byEmail.length) throw new Error("Este e-mail já está em uso.");
+    const { data: byDoc } = await supabaseAdmin.from("profiles").select("id").eq("document", document).limit(1);
+    if (byDoc && byDoc.length) throw new Error("Este CPF/CNPJ já está cadastrado.");
+    const { data: byPhone } = await supabaseAdmin.from("profiles").select("id").eq("phone", phone).limit(1);
+    if (byPhone && byPhone.length) throw new Error("Este telefone já está cadastrado.");
 
-    if (existing && existing.length > 0) {
-      const hit = existing[0] as any;
-      if (hit.email?.toLowerCase() === email) {
-        throw new Error("Este e-mail já está em uso.");
-      }
-      if (hit.document === document) {
-        throw new Error("Este CPF/CNPJ já está cadastrado.");
-      }
-      if (hit.phone === phone) {
-        throw new Error("Este telefone já está cadastrado.");
-      }
-      throw new Error("Já existe uma conta ativa com estes dados.");
-    }
-
-    // Create auth user already confirmed — no confirmation email is sent.
     const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: input.password,
@@ -65,23 +44,19 @@ export const registerUser = createServerFn({ method: "POST" })
 
     if (createError || !created?.user) {
       const msg = createError?.message || "Falha ao criar conta.";
-      if (/already|registered|exists/i.test(msg)) {
-        throw new Error("Este e-mail já está em uso.");
-      }
+      if (/already|registered|exists/i.test(msg)) throw new Error("Este e-mail já está em uso.");
       throw new Error(msg);
     }
 
     const userId = created.user.id;
 
-    // Profile — must exist for admin list and KYC flow
-    const { error: profileError } = await supabaseAdmin.from("profiles").upsert(
+    await supabaseAdmin.from("profiles").upsert(
       {
         id: userId,
         email,
         full_name: fullName,
         document,
         phone,
-        // unverified until the user actually submits documents
         kyc_status: isOwner ? "verified" : "unverified",
         verification_status: isOwner ? "verified" : "unverified",
         status: "active",
@@ -90,11 +65,6 @@ export const registerUser = createServerFn({ method: "POST" })
       { onConflict: "id" },
     );
 
-    if (profileError) {
-      console.error("[registerUser] profile upsert error:", profileError);
-    }
-
-    // Wallet (unique is typically user_id + currency)
     const { data: existingWallet } = await supabaseAdmin
       .from("wallets")
       .select("id")
@@ -102,19 +72,12 @@ export const registerUser = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (!existingWallet) {
-      const { error: walletError } = await supabaseAdmin.from("wallets").insert({
+      await supabaseAdmin.from("wallets").insert({
         user_id: userId,
         balance: 0,
         currency: "BRL",
       } as any);
-
-      if (walletError) {
-        console.error("[registerUser] wallet insert error:", walletError);
-      }
     }
 
-    return {
-      success: true,
-      email,
-    };
+    return { success: true, email };
   });

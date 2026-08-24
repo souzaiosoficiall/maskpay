@@ -28,11 +28,8 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (!sessionReady) return;
     
-    // Update server-side access time
     doUpdateLastAccess({}).catch(() => undefined);
     
-    // 24h inactivity: if the user closed the app and does not return within 24h,
-    // force logout. Closing the tab alone keeps the session (localStorage).
     const lastAccess = window.localStorage.getItem('maskpay-login-timestamp');
     const now = Date.now();
     const twentyFourHours = 24 * 60 * 60 * 1000;
@@ -46,7 +43,6 @@ function AuthenticatedLayout() {
       return;
     }
 
-    // Refresh last-access timestamp on every authenticated navigation
     window.localStorage.setItem('maskpay-login-timestamp', now.toString());
   }, [sessionReady, location.pathname, doUpdateLastAccess]);
 
@@ -62,29 +58,24 @@ function AuthenticatedLayout() {
       return;
     }
 
-    // Se o perfil existe mas não é admin, verifica se a conta está verificada
     if (profile.role !== 'admin') {
       const isVerified = profile.verification_status === 'verified';
-      // pending_review = documentos já enviados. "unverified" still needs /verify.
       const alreadySubmitted =
         profile.verification_status === 'pending' ||
         profile.verification_status === 'pending_review';
       
-      // Permitir acesso APENAS a rotas essenciais se não estiver verificado
       const allowedPaths = ['/dashboard', '/support', '/verify', '/settings'];
       const currentPath = location.pathname;
       
       const isAllowed = allowedPaths.some(path => currentPath === path || currentPath.startsWith(path + '/'));
 
-      // Se não estiver verificado e não for uma rota permitida, volta pro dashboard
       if (!isVerified && !isAllowed) {
         console.log(`[AuthenticatedLayout] Access denied to ${currentPath} (KYC pending). Redirecting to dashboard.`);
         navigate({ to: '/dashboard', replace: true });
         return;
       }
 
-      // Só bloqueia /verify quando os documentos JÁ foram enviados (em análise).
-      // Usuário com verification_status = unverified deve conseguir abrir o formulário.
+      // Only block /verify after documents were submitted
       if (alreadySubmitted && currentPath.startsWith('/verify')) {
         console.log(`[AuthenticatedLayout] Verification already pending. Redirecting to dashboard.`);
         navigate({ to: '/dashboard', replace: true });

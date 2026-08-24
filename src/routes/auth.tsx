@@ -238,7 +238,6 @@ function AuthPage() {
         },
       });
 
-      // Establish browser session with the password the user just chose.
       const { error: loginAfterRegError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,

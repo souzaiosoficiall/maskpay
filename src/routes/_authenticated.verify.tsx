@@ -60,12 +60,21 @@ function VerifyPage() {
   const fetchProfile = useServerFn(getProfile);
   const doSubmitVerification = useServerFn(submitVerification);
 
-  const { data: profile, isLoading: isProfileLoading } = useQuery({
+  const { data: profile, isLoading: isProfileLoading, isFetching, isError, refetch, error } = useQuery({
     queryKey: ['profile'],
     queryFn: () => fetchProfile({}),
     enabled: sessionReady,
     refetchOnWindowFocus: true,
-  }) as { data: ProfileWithRole | undefined, isLoading: boolean };
+    retry: 3,
+    retryDelay: 800,
+  }) as {
+    data: ProfileWithRole | undefined;
+    isLoading: boolean;
+    isFetching: boolean;
+    isError: boolean;
+    refetch: () => void;
+    error: Error | null;
+  };
 
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
@@ -101,7 +110,7 @@ function VerifyPage() {
     setIsSubmitting(true);
     try {
       const timestamp = Date.now();
-      const folder = profile?.id || 'anonymous';
+      const folder = effectiveProfile?.id && effectiveProfile.id !== 'pending' ? effectiveProfile.id : 'anonymous';
       const frontPath = `${folder}/front_${timestamp}.${files.front.name.split('.').pop()}`;
       const backPath = `${folder}/back_${timestamp}.${files.back.name.split('.').pop()}`;
       const selfiePath = `${folder}/selfie_${timestamp}.${files.selfie.name.split('.').pop()}`;
@@ -140,9 +149,8 @@ function VerifyPage() {
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => s - 1);
 
-  // Still restoring session or fetching profile — keep spinner only (no early
-  // "session expired" / "voltar ao dashboard" that interrupts KYC upload).
-  if (!sessionReady || isProfileLoading) {
+  // Wait for session + profile. getProfile is resilient and should always return a row.
+  if (!sessionReady || isProfileLoading || (isFetching && !profile)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8 animate-in fade-in duration-700">
         <div className="relative">
@@ -159,34 +167,9 @@ function VerifyPage() {
     );
   }
 
-  if (!profile) {
-     return (
-       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8 animate-in zoom-in-95 duration-500">
-         <div className="w-20 h-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mb-2">
-            <Lock className="w-8 h-8 text-primary/40" />
-         </div>
-         <div className="text-center space-y-2 px-6">
-           <h2 className="text-lg font-black uppercase tracking-tighter">Não foi possível carregar seu perfil</h2>
-           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">Tente novamente. Se o problema continuar, faça login outra vez.</p>
-         </div>
-         <div className="flex flex-col sm:flex-row gap-3">
-           <Button 
-            onClick={() => window.location.reload()} 
-            className="bg-white text-black hover:bg-white/90 rounded-2xl px-10 h-12 font-black uppercase tracking-widest text-xs"
-           >
-              Tentar novamente
-           </Button>
-           <Button 
-            variant="outline"
-            onClick={() => navigate({ to: '/dashboard' })} 
-            className="rounded-2xl px-10 h-12 font-black uppercase tracking-widest text-xs border-white/10"
-           >
-              Voltar ao Dashboard
-           </Button>
-         </div>
-       </div>
-     );
-  }
+  // Soft fallback: still show the KYC form even if profile payload is incomplete.
+  // Uploads only need an id for the storage path; submitVerification uses the auth userId server-side.
+  const effectiveProfile = profile || ({ id: 'pending', verification_status: 'unverified' } as ProfileWithRole);
 
   return (
     <div className="max-w-3xl mx-auto py-6 md:py-10 px-4 pb-[env(safe-area-inset-bottom)]">
