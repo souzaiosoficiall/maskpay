@@ -23,16 +23,16 @@ export function AuthVisualPanel() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#0a0a0a_70%)]" />
 
       <div className="relative z-10 flex w-full max-w-xl flex-col items-center px-10">
-        <h2 className="mb-14 text-center text-3xl font-bold tracking-tight text-white xl:text-4xl">
-          Pagamentos de um jeito{" "}
-          <span className="text-white">fácil.</span>
+        <h2 className="mb-14 text-center text-3xl font-bold tracking-tight text-white xl:text-4xl leading-tight">
+          Tudo conectado para você
+          <br />
+          <span className="text-white/90">vender mais.</span>
         </h2>
 
         {/* Diagram */}
         <div className="relative mx-auto h-[340px] w-full max-w-[420px]">
-          {/* SVG connecting lines */}
           <svg
-            className="absolute inset-0 h-full w-full"
+            className="absolute inset-0 h-full w-full overflow-visible"
             viewBox="0 0 420 340"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -40,36 +40,32 @@ export function AuthVisualPanel() {
           >
             <defs>
               <linearGradient id="lineBase" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="rgba(255,255,255,0.12)" />
-                <stop offset="100%" stopColor="rgba(255,255,255,0.08)" />
+                <stop offset="0%" stopColor="rgba(255,255,255,0.18)" />
+                <stop offset="100%" stopColor="rgba(255,255,255,0.12)" />
               </linearGradient>
 
-              {/* Animated light gradient */}
               <linearGradient id="lightGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="rgba(255,255,255,0)" />
-                <stop offset="40%" stopColor="rgba(255,255,255,0.15)" />
-                <stop offset="50%" stopColor="rgba(255,255,255,0.95)" />
-                <stop offset="60%" stopColor="rgba(255,255,255,0.15)" />
+                <stop offset="35%" stopColor="rgba(255,255,255,0.2)" />
+                <stop offset="50%" stopColor="rgba(255,255,255,1)" />
+                <stop offset="65%" stopColor="rgba(255,255,255,0.2)" />
                 <stop offset="100%" stopColor="rgba(255,255,255,0)" />
               </linearGradient>
             </defs>
 
             {/* Base paths: left nodes → center */}
-            {/* PIX */}
             <path
               d="M 70 40 C 140 40, 170 160, 210 170"
               stroke="url(#lineBase)"
               strokeWidth="1.5"
               fill="none"
             />
-            {/* API */}
             <path
               d="M 70 170 C 140 170, 170 170, 210 170"
               stroke="url(#lineBase)"
               strokeWidth="1.5"
               fill="none"
             />
-            {/* Suporte */}
             <path
               d="M 70 300 C 140 300, 170 180, 210 170"
               stroke="url(#lineBase)"
@@ -91,8 +87,8 @@ export function AuthVisualPanel() {
               stroke="url(#lightGrad)"
               strokeWidth="2"
               fill="none"
-              strokeDasharray="40 200"
-              pathLength={240}
+              strokeDasharray="36 220"
+              pathLength={256}
             />
             <path
               className="auth-line-light auth-line-light-delay-1"
@@ -100,8 +96,8 @@ export function AuthVisualPanel() {
               stroke="url(#lightGrad)"
               strokeWidth="2"
               fill="none"
-              strokeDasharray="40 160"
-              pathLength={200}
+              strokeDasharray="36 180"
+              pathLength={216}
             />
             <path
               className="auth-line-light auth-line-light-delay-2"
@@ -109,8 +105,8 @@ export function AuthVisualPanel() {
               stroke="url(#lightGrad)"
               strokeWidth="2"
               fill="none"
-              strokeDasharray="40 200"
-              pathLength={240}
+              strokeDasharray="36 220"
+              pathLength={256}
             />
             <path
               className="auth-line-light auth-line-light-delay-3"
@@ -118,12 +114,11 @@ export function AuthVisualPanel() {
               stroke="url(#lightGrad)"
               strokeWidth="2.5"
               fill="none"
-              strokeDasharray="30 120"
-              pathLength={150}
+              strokeDasharray="28 140"
+              pathLength={168}
             />
           </svg>
 
-          {/* Left nodes */}
           <Node
             className="absolute left-0 top-[12px]"
             icon={<QrCode className="h-4 w-4" />}
@@ -140,7 +135,6 @@ export function AuthVisualPanel() {
             label="SUPORTE"
           />
 
-          {/* Center — MaskPay logo */}
           <div className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black shadow-[0_0_40px_rgba(255,255,255,0.08)]">
             <img
               src={maskPlatformAsset.url}
@@ -149,7 +143,6 @@ export function AuthVisualPanel() {
             />
           </div>
 
-          {/* Right — Você */}
           <Node
             className="absolute right-0 top-[142px]"
             icon={
@@ -167,10 +160,9 @@ export function AuthVisualPanel() {
         </p>
       </div>
 
-      {/* CSS for light travel animation */}
       <style>{`
         @keyframes auth-line-travel {
-          0% { stroke-dashoffset: 240; }
+          0% { stroke-dashoffset: 260; }
           100% { stroke-dashoffset: 0; }
         }
         .auth-line-light {
