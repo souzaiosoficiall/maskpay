@@ -24,9 +24,9 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import maskPlatformAsset from "@/lib/mask-asset";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function DashboardLayout() {
@@ -219,7 +219,7 @@ export default function DashboardLayout() {
       {/* Desktop Sidebar */}
       <aside 
         className={cn(
-          "bg-card border-r border-white/5 flex flex-col transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] z-50 hidden lg:flex",
+          "bg-card border-r border-white/5 flex flex-col transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] z-50 hidden lg:flex",
           isSidebarOpen ? "w-64" : "w-20"
         )}
       >
@@ -246,24 +246,15 @@ export default function DashboardLayout() {
               <Menu className="h-5 w-5" />
             </Button>
 
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="lg:hidden text-muted-foreground/60 hover:text-white rounded-xl"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side="left"
-                className="p-0 w-72 border-white/5 bg-background data-[state=open]:duration-1000 data-[state=closed]:duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
-              >
-                <SidebarContent isMobile />
-              </SheetContent>
-            </Sheet>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden text-muted-foreground/60 hover:text-white rounded-xl"
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Abrir menu"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
           </div>
 
           {/* Centro: ícone + MaskPay (sem "|") */}
@@ -293,6 +284,36 @@ export default function DashboardLayout() {
           </div>
         </main>
       </div>
+
+      {/* Menu mobile — Framer Motion (abertura/fechamento suaves) */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.button
+              key="maskpay-drawer-overlay"
+              type="button"
+              aria-label="Fechar menu"
+              className="fixed inset-0 z-[60] bg-black/70 lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            <motion.aside
+              key="maskpay-drawer-panel"
+              className="fixed inset-y-0 left-0 z-[70] w-72 max-w-[85vw] bg-background border-r border-white/5 flex flex-col lg:hidden shadow-2xl"
+              style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <SidebarContent isMobile />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
