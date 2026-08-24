@@ -46,7 +46,8 @@ export default function DashboardLayout() {
     staleTime: 5000,
   }) as { data: ProfileWithRole | undefined; isLoading: boolean };
 
-  const isKycLocked = !sessionReady || isProfileLoading || !profile || profile.verification_status !== 'verified';
+  // Wait for profile — don't lock (or flash) while loading for verified accounts
+  const isKycLocked = !!profile && profile.role !== 'admin' && profile.verification_status !== 'verified';
 
   useEffect(() => {
     setIsMobileMenuOpen(false);

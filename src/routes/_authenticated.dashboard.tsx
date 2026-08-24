@@ -66,7 +66,16 @@ function DashboardPage() {
     staleTime: 15_000,
   });
   
-  const isKycLocked = !sessionReady || isLoadingProfile || (profile && profile.verification_status !== 'verified');
+  // Only treat as locked after profile is loaded — avoids flash of "pending" for verified users
+  const isKycLocked = !!profile && profile.role !== 'admin' && profile.verification_status !== 'verified';
+  const showUnverifiedBanner =
+    !isLoadingProfile &&
+    !!profile &&
+    profile.role !== 'admin' &&
+    (profile.verification_status === 'unverified' ||
+      profile.verification_status === null ||
+      profile.verification_status === undefined ||
+      profile.verification_status === '');
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet', profile?.id],
@@ -143,7 +152,7 @@ function DashboardPage() {
         </Card>
       )}
 
-      {(profile?.verification_status === 'unverified' || !profile?.verification_status) && profile?.role !== 'admin' && (
+      {showUnverifiedBanner && (
         <Card className="border-red-500/20 bg-red-500/10 rounded-[2rem] overflow-hidden border-2 shadow-lg shadow-red-500/5">
           <CardContent className="p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-5 md:gap-6">
             <div className="flex items-center gap-4 w-full md:w-auto">
