@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   FileCode2,
+  BookOpen,
   Receipt,
   MessageSquare,
   Lock,
@@ -55,6 +56,7 @@ export default function DashboardLayout() {
     { icon: Webhook, label: 'Movimentações', to: '/transactions' },
     { icon: Receipt, label: 'Taxas', to: '/rates' },
     { icon: FileCode2, label: 'API', to: '/api-keys' },
+    { icon: BookOpen, label: 'Documentação', to: '/docs' },
   ];
 
   const SidebarContent = ({ isMobile = false }) => (
@@ -217,7 +219,7 @@ export default function DashboardLayout() {
       {/* Desktop Sidebar */}
       <aside 
         className={cn(
-          "bg-card border-r border-white/5 flex flex-col transition-all duration-300 z-50 hidden lg:flex",
+          "bg-card border-r border-white/5 flex flex-col transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] z-50 hidden lg:flex",
           isSidebarOpen ? "w-64" : "w-20"
         )}
       >
@@ -256,7 +258,7 @@ export default function DashboardLayout() {
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="p-0 w-72 border-white/5 bg-background data-[state=open]:duration-700 data-[state=closed]:duration-500"
+                className="p-0 w-72 border-white/5 bg-background data-[state=open]:duration-1000 data-[state=closed]:duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
                 style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
               >
                 <SidebarContent isMobile />

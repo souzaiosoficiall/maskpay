@@ -187,3 +187,18 @@ html, body, #root {
     padding-top: 0 !important;
   }
 }
+
+
+/* Menu lateral: abertura mais suave (não seca) */
+[data-slot="sheet-content"],
+[data-state="open"][class*="slide-in-from-left"],
+[data-state="closed"][class*="slide-out-to-left"],
+.fixed.z-50[class*="slide-in-from-left"],
+.fixed.z-50[class*="slide-out-to-left"] {
+  transition-duration: 1000ms !important;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+[data-state="closed"][class*="slide-out-to-left"],
+.fixed.z-50[data-state="closed"] {
+  transition-duration: 700ms !important;
+}
