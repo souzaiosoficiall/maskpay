@@ -344,7 +344,7 @@ function SupportPage() {
                           value={message}
                           onChange={(e) => setMessage(e.target.value)}
                           placeholder="DIGITE SUA MENSAGEM..."
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-6 pr-12 text-[10px] font-black tracking-widest text-white placeholder:text-muted-foreground/20 focus:outline-none focus:border-white/20 transition-all uppercase"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-4 pr-12 text-base md:text-sm font-bold tracking-wide text-white placeholder:text-muted-foreground/30 focus:outline-none focus:border-white/20 transition-all"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
@@ -369,7 +369,7 @@ function SupportPage() {
                       <Button 
                         disabled={!message.trim() || isUploading}
                         onClick={() => sendMessageMutation.mutate(message)}
-                        className="h-14 w-14 rounded-2xl bg-white text-black hover:bg-white/90 p-0 flex items-center justify-center shrink-0 shadow-lg shadow-white/5"
+                        className="h-12 w-12 md:h-14 md:w-14 rounded-2xl bg-white text-black hover:bg-white/90 p-0 flex items-center justify-center shrink-0 shadow-lg shadow-white/5"
                       >
                         <Send className="w-5 h-5" />
                       </Button>
@@ -463,7 +463,7 @@ function SupportPage() {
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="DESCREVA O PROBLEMA OU SUGESTÃO EM DETALHES..."
-                        className="w-full bg-white/5 border border-white/10 rounded-[2rem] p-6 text-[10px] font-black tracking-widest text-white placeholder:text-muted-foreground/20 focus:outline-none focus:border-white/20 transition-all uppercase min-h-[160px] resize-none"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-base md:text-sm font-bold tracking-wide text-white placeholder:text-muted-foreground/30 focus:outline-none focus:border-white/20 transition-all min-h-[140px] resize-none"
                       />
                     </div>
 

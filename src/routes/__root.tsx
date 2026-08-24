@@ -86,7 +86,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" },
       { title: "MaskPay | Infraestrutura de Pagamentos Global" },
       { name: "description", content: "Aceite pagamentos, envie transferências e gerencie seu fluxo de caixa global com a MaskPay." },
       { name: "author", content: "MaskPay" },
@@ -136,19 +136,21 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem('maskpay-layout-compact') === '1') {
+        document.documentElement.classList.add('layout-compact');
+      }
+    } catch {}
+  }, []);
+
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       <IntegrationScripts />
       <Outlet />
-      <Toaster
-        position="bottom-center"
-        offset={24}
-        visibleToasts={3}
-        richColors
-        closeButton
-      />
+      <Toaster position="top-right" />
       <DevToolsDetector />
     </QueryClientProvider>
   );

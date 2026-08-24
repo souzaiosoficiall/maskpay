@@ -251,7 +251,7 @@ export function SupportCenter({
                         value={replyMessage}
                         onChange={(e) => setReplyMessage(e.target.value)}
                         placeholder="DIGITE A RESPOSTA..."
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-6 pr-12 text-[10px] font-black tracking-widest text-white focus:outline-none uppercase"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-4 pr-12 text-base md:text-sm font-bold tracking-wide text-white focus:outline-none"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
