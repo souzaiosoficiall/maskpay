@@ -6,6 +6,7 @@ import { getProfile, type ProfileWithRole } from '@/lib/settings.functions';
 import { updateLastAccess } from '@/lib/auth-session.functions';
 import { useSessionReady } from '@/hooks/useSessionReady';
 import { supabase } from '@/integrations/supabase/client';
+import { isSecurityLocked, clearAuthStorage } from '@/lib/security-lock';
 import DashboardLayout from '@/components/DashboardLayout';
 import { AppLockScreen, isAppUnlocked, markAppUnlocked } from '@/components/AppLockScreen';
 
@@ -17,6 +18,18 @@ function AuthenticatedLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const sessionReady = useSessionReady();
+
+  // DevTools lock: never allow authenticated routes while lock is active
+  useEffect(() => {
+    if (!isSecurityLocked()) return;
+    clearAuthStorage();
+    supabase.auth.signOut({ scope: 'local' }).then(() => {
+      window.location.replace('/');
+    }).catch(() => {
+      window.location.replace('/');
+    });
+  }, []);
+
   const fetchProfile = useServerFn(getProfile);
   const doUpdateLastAccess = useServerFn(updateLastAccess);
 

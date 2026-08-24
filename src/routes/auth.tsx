@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { clearSecurityLock, isSecurityLocked, clearAuthStorage } from '@/lib/security-lock';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,8 +31,14 @@ function AuthPage() {
   const isLogin = mode === 'login';
 
   // Already logged in → skip login screen (session restored from localStorage)
+  // If security lock is active (DevTools was opened), force logout and stay on login.
   useEffect(() => {
     let cancelled = false;
+    if (isSecurityLocked()) {
+      clearAuthStorage();
+      supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       if (data.session?.access_token) {
@@ -185,6 +192,7 @@ function AuthPage() {
 
         window.localStorage.setItem('maskpay-login-timestamp', Date.now().toString());
         try { sessionStorage.setItem('maskpay-app-unlocked', '1'); } catch {}
+        clearSecurityLock();
         window.location.href = '/dashboard';
         return;
       }
@@ -275,6 +283,7 @@ function AuthPage() {
 
         toast.success('Conta criada com sucesso!');
         try { sessionStorage.setItem('maskpay-app-unlocked', '1'); } catch {}
+        clearSecurityLock();
         // Use window.location.href to ensure a clean state and skip any cached auth checks
         window.location.href = '/dashboard';
         return;

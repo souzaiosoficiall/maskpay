@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import Lenis from 'lenis';
 import { supabase } from '@/integrations/supabase/client';
+import { isSecurityLocked, clearAuthStorage } from '@/lib/security-lock';
 
 const coinsAsset = { url: "/assets/coins.png" };
 const maskLogoAsset = { url: "/assets/mask_logo.png" };
@@ -180,6 +181,11 @@ function LandingPage() {
   // If already logged in, skip homepage and go straight to the account (lock screen / dashboard)
   useEffect(() => {
     let cancelled = false;
+    if (isSecurityLocked()) {
+      clearAuthStorage();
+      supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       if (data.session?.access_token) {

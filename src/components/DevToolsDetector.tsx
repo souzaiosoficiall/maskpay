@@ -1,74 +1,89 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  clearAuthStorage,
+  clearSecurityLock,
+  enforceSecurityLock,
+  isSecurityLocked,
+} from '@/lib/security-lock';
 
 const YOUTUBE_URL = 'https://www.youtube.com/watch?v=kYJjYy_PmqA';
 
-/**
- * Wipe local auth so browser "Back" after the YouTube redirect
- * cannot restore a logged-in session.
- */
-function clearAuthState() {
+async function hardSignOut() {
   try {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-      const lower = key.toLowerCase();
-      if (
-        lower.includes('supabase') ||
-        lower.includes('auth') ||
-        lower.includes('maskpay') ||
-        lower.includes('sb-')
-      ) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
+    const { supabase } = await import('@/integrations/supabase/client');
+    await supabase.auth.signOut({ scope: 'local' });
   } catch {
     // ignore
   }
-
-  try {
-    sessionStorage.clear();
-  } catch {
-    // ignore
-  }
-
-  // Best-effort sign out via Supabase client (dynamic import to avoid circular deps)
-  try {
-    import('@/integrations/supabase/client')
-      .then(({ supabase }) => supabase.auth.signOut({ scope: 'local' }))
-      .catch(() => undefined);
-  } catch {
-    // ignore
-  }
+  clearAuthStorage();
 }
 
 /**
  * Client-side inspection deterrent.
- * When DevTools / inspection is detected:
- * 1. Clears any persisted login session
- * 2. Covers the UI (no icons)
- * 3. Forces navigation to the configured YouTube video
  *
- * Clearing auth prevents "Back" from landing inside a logged-in account.
+ * On detect:
+ * 1. Sets a durable security lock in localStorage
+ * 2. Wipes auth tokens
+ * 3. Navigates to YouTube
+ *
+ * On any later return (Back / bfcache / reopen):
+ * if the lock is set → force logout and send user to homepage.
+ * Lock is only cleared after a fresh password login.
  */
 export function DevToolsDetector() {
   const [isDetected, setIsDetected] = useState(false);
   const triggeredRef = useRef(false);
 
   useEffect(() => {
-    // Allow local development
-    if (import.meta.env.DEV) return;
+    // If user came back via Back button with lock still set, kick them out immediately
+    const kickIfLocked = async () => {
+      if (!isSecurityLocked()) return;
+      triggeredRef.current = true;
+      setIsDetected(true);
+      await hardSignOut();
+      // Stay locked — only successful login clears it
+      try {
+        document.documentElement.style.visibility = 'hidden';
+      } catch {
+        // ignore
+      }
+      const path = window.location.pathname;
+      if (path !== '/' && !path.startsWith('/auth')) {
+        window.location.replace('/');
+      } else {
+        try {
+          document.documentElement.style.visibility = '';
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    // Run on mount (covers Back from YouTube → restored app page)
+    kickIfLocked();
+
+    // bfcache restore
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted || isSecurityLocked()) {
+        kickIfLocked();
+      }
+    };
+    window.addEventListener('pageshow', onPageShow);
+
+    // Allow local development tooling
+    if (import.meta.env.DEV) {
+      return () => window.removeEventListener('pageshow', onPageShow);
+    }
 
     const triggerProtection = () => {
       if (triggeredRef.current) return;
       triggeredRef.current = true;
       setIsDetected(true);
 
-      // CRITICAL: destroy session before leaving so Back cannot restore the app logged-in
-      clearAuthState();
+      // Lock + wipe BEFORE leaving — survives Back
+      enforceSecurityLock();
+      hardSignOut();
 
-      // Hide page content immediately (no icons / UI visible)
       try {
         document.documentElement.style.visibility = 'hidden';
         document.body.style.visibility = 'hidden';
@@ -76,25 +91,22 @@ export function DevToolsDetector() {
         // ignore
       }
 
-      // Replace current history entry so Back does not return to the form mid-session
+      // Nuke in-tab history so Back cannot land on an authenticated route
       try {
-        window.history.replaceState(null, '', '/');
+        const home = window.location.origin + '/';
+        window.history.replaceState(null, '', home);
+        // Push a disposable entry then replace with YouTube via location
       } catch {
         // ignore
       }
 
-      // Force navigate to YouTube
       try {
         window.location.replace(YOUTUBE_URL);
       } catch {
         try {
           window.location.href = YOUTUBE_URL;
         } catch {
-          try {
-            window.open(YOUTUBE_URL, '_self');
-          } catch {
-            // ignore
-          }
+          window.open(YOUTUBE_URL, '_self');
         }
       }
     };
@@ -162,20 +174,6 @@ export function DevToolsDetector() {
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('resize', checkDimensions);
 
-    // If user returns via Back/forward cache with DevTools still open, re-check
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) {
-        // Coming from bfcache — ensure we are not authenticated if protection already fired
-        if (triggeredRef.current) {
-          clearAuthState();
-          window.location.replace('/');
-        } else {
-          detect();
-        }
-      }
-    };
-    window.addEventListener('pageshow', onPageShow);
-
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('contextmenu', handleContextMenu, true);
@@ -195,3 +193,6 @@ export function DevToolsDetector() {
     />
   );
 }
+
+/** Call after successful password login so the user can use the app again. */
+export { clearSecurityLock };

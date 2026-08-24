@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isSecurityLocked, clearAuthStorage } from '@/lib/security-lock';
 
 /**
  * True once a persisted session with access_token has been restored.
@@ -11,8 +12,18 @@ export function useSessionReady() {
   useEffect(() => {
     let mounted = true;
 
+    if (isSecurityLocked()) {
+      clearAuthStorage();
+      setReady(false);
+      supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
+      if (isSecurityLocked()) {
+        setReady(false);
+        return;
+      }
       const has = !!data.session?.access_token;
       setReady(has);
       if (has) {
