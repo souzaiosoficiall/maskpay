@@ -6,6 +6,54 @@ import { calculateDepositAmounts, calculateWithdrawalAmounts } from "./fees-logi
 import { callEvoPay } from "./evopay-client.server";
 
 /**
+ * Builds the public webhook URL for EvoPay callbacks.
+ */
+function getWebhookUrl(): string {
+  const siteUrl = process.env["SITE_URL"];
+  const host = process.env["HOST"];
+  const vercel = process.env["VERCEL_URL"];
+  let base: string | null = null;
+  if (siteUrl) base = siteUrl;
+  else if (host) base = `https://${host}`;
+  else if (vercel) base = `https://${vercel}`;
+  if (!base) {
+    console.warn("[Audit] SITE_URL/HOST/VERCEL_URL not set — callbackUrl may be invalid");
+    return "https://localhost/api/public/payment-webhook";
+  }
+  return `${String(base).replace(/\/$/, "")}/api/public/payment-webhook`;
+}
+
+/**
+ * Extracts QR / copia-e-cola from heterogeneous EvoPay response shapes.
+ */
+function extractPixCodes(evoData: any): { qrCode: string | null; copyPaste: string | null } {
+  if (!evoData || typeof evoData !== "object") {
+    return { qrCode: null, copyPaste: null };
+  }
+  const copyPaste =
+    evoData.qrCodeText ||
+    evoData.qrCode ||
+    evoData.brCode ||
+    evoData.emv ||
+    evoData.pixCopyPaste ||
+    evoData.pix_copy_paste ||
+    evoData.copy_paste ||
+    evoData.copyPaste ||
+    evoData.payload ||
+    null;
+
+  const qrCode =
+    evoData.qrCodeBase64 ||
+    evoData.qrCodeImage ||
+    evoData.pix_qrcode_base64 ||
+    evoData.qrcode ||
+    evoData.qrCode ||
+    copyPaste;
+
+  return { qrCode: qrCode || null, copyPaste: copyPaste || null };
+}
+
+/**
  * Fetches the current platform fees from the database.
  */
 export const getPlatformFees = createServerFn({ method: "GET" })
@@ -14,34 +62,32 @@ export const getPlatformFees = createServerFn({ method: "GET" })
     return await fetchPlatformFees(context.supabase);
   });
 
-
 /**
- * Generates a Pix payment using the provider.
+ * Generates a Pix payment using the provider (EvoPay POST /v1/pix/).
+ * Official fields: amount (number BRL), callbackUrl, clientReference.
+ * @see https://docs.partners.evopay.cash/pt/guide/authentication
  */
 export const generatePixDeposit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => 
-    z.object({
-      amount: z.number().min(1, "O valor mínimo é R$ 1,00")
-    }).parse(data)
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        amount: z.number().min(1, "O valor mínimo é R$ 1,00"),
+      })
+      .parse(data)
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    
-    // 1. Fetch fees
+
     const feesResp = await fetchPlatformFees(supabase);
     const { feeAmount, netAmount } = calculateDepositAmounts(data.amount, feesResp.deposit);
 
-    // 2. Fetch credentials (safe on server)
-    const EVOPAY_MERCHANT_ID = process.env['EVOPAY_MERCHANT_ID'];
-    const EVOPAY_API_TOKEN = process.env['EVOPAY_API_TOKEN'];
-
+    const EVOPAY_API_TOKEN = process.env["EVOPAY_API_TOKEN"];
     if (!EVOPAY_API_TOKEN) {
       console.error("ERRO: EVOPAY_API_TOKEN não configurado. Pagamentos reais desativados.");
       throw new Error("Sistema de pagamentos em manutenção. Por favor, tente novamente mais tarde.");
     }
 
-    // REAL INTEGRATION: Call provider API
     try {
       const { data: wallet } = await supabase
         .from("wallets")
@@ -49,7 +95,6 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
         .eq("user_id", userId)
         .single();
 
-      // Create record
       const { data: tx, error: txError } = await (supabase.from("transactions") as any)
         .insert({
           wallet_id: wallet?.id,
@@ -59,65 +104,74 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
           type: "deposit",
           status: "pending",
           description: "Depósito Pix",
-          metadata: {}
+          metadata: {},
         })
         .select()
         .single();
 
       if (txError) throw new Error(txError.message);
 
-      // Call provider using the new centralized client
-      // Documentation endpoint: POST /pix/
-      const evoData = await callEvoPay('/pix/', {
-        method: 'POST',
+      // Official EvoPay payload (camelCase) — docs.partners.evopay.cash
+      const evoData = await callEvoPay("/pix/", {
+        method: "POST",
         body: {
           amount: Number(data.amount.toFixed(2)),
-          callback_url: `${process.env['SITE_URL'] || 'https://' + process.env['HOST']}/api/public/payment-webhook`,
-          external_id: String(tx.id), // Simplified for provider reference
-          merchant_id: process.env['EVOPAY_MERCHANT_ID']
-        }
+          callbackUrl: getWebhookUrl(),
+          clientReference: String(tx.id),
+        },
       });
 
-      // Update record with Provider ID
+      const providerId = evoData?.id || evoData?.transactionId || evoData?.transaction_id || null;
+      const { qrCode, copyPaste } = extractPixCodes(evoData);
+
       await (supabase.from("transactions") as any)
         .update({
-          provider_id: evoData.id || evoData.transactionId,
-          metadata: { provider_raw: evoData }
+          provider_id: providerId,
+          metadata: { provider_raw: evoData, clientReference: String(tx.id) },
         })
         .eq("id", tx.id);
 
+      if (!copyPaste && !qrCode) {
+        console.error("[Audit] EvoPay returned success but no QR/copy-paste fields:", evoData);
+        throw new Error(
+          "A adquirente criou a cobrança, mas não retornou o QR Code. Verifique o formato da resposta nos logs."
+        );
+      }
+
       return {
-        qrCode: evoData.qrCodeText || evoData.pix_qrcode_base64 || evoData.qrcode,
-        copyPaste: evoData.qrCodeText || evoData.pix_copy_paste || evoData.copy_paste,
+        qrCode: qrCode || copyPaste,
+        copyPaste: copyPaste || qrCode,
         transactionId: tx.id,
+        providerId,
         amount: data.amount,
         fee: feeAmount,
-        net: netAmount
+        net: netAmount,
       };
     } catch (err: any) {
       console.error("Payment Provider Audit Failure:", err);
-      // Propagate the specific error message from the client
       throw new Error(err.message || "ERRO VINDO DA RESPOSTA DA ADQUIRENTE");
     }
   });
 
 /**
- * Requests a Pix withdrawal via the provider.
+ * Requests a Pix withdrawal via the provider (EvoPay cash-out).
+ * Uses camelCase fields consistent with the rest of the EvoPay API.
  */
 export const requestPixWithdrawal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
-    z.object({
-      amount: z.number().min(1, "O valor mínimo é R$ 1,00"),
-      pixKeyType: z.string(),
-      pixKey: z.string(),
-      transactionPassword: z.string().length(4)
-    }).parse(data)
+    z
+      .object({
+        amount: z.number().min(1, "O valor mínimo é R$ 1,00"),
+        pixKeyType: z.string(),
+        pixKey: z.string(),
+        transactionPassword: z.string().length(4),
+      })
+      .parse(data)
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // 1. Validate Transaction Password
     const { data: profile } = await (supabase.from("profiles") as any)
       .select("transaction_password_hash, kyc_status")
       .eq("id", userId)
@@ -127,10 +181,6 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
       throw new Error("Senha de transação incorreta.");
     }
 
-    // No longer blocking by KYC here, as routes already handle this via isKycLocked
-    // and we want to allow the process to be as smooth as possible once verified.
-
-    // 2. Check Balance
     const { data: wallet } = await supabase
       .from("wallets")
       .select("id, balance")
@@ -141,13 +191,11 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
       throw new Error("Saldo insuficiente.");
     }
 
-    // 3. Calculate Fees
     const feesResp = await fetchPlatformFees(supabase);
     const { feeAmount, netAmount } = calculateWithdrawalAmounts(data.amount, feesResp.withdrawal);
 
     if (netAmount <= 0) throw new Error("Valor líquido insuficiente após taxas.");
 
-    // 4. Create Pending Transaction
     const { data: tx, error: txError } = await (supabase.from("transactions") as any)
       .insert({
         wallet_id: wallet.id,
@@ -157,55 +205,60 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
         type: "withdrawal",
         status: "pending",
         description: `Saque Pix para chave ${data.pixKey}`,
-        metadata: { pix_key: data.pixKey, pix_type: data.pixKeyType }
+        metadata: { pix_key: data.pixKey, pix_type: data.pixKeyType },
       })
       .select()
       .single();
 
     if (txError) throw new Error(txError.message);
 
-    // 5. Deduct balance (Lock it) — privileged operation, runs with service role
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.rpc("adjust_wallet_balance", {
       p_wallet_id: wallet.id,
-      p_amount: -data.amount
+      p_amount: -data.amount,
     });
 
-
-
     try {
-      // Call provider using the new centralized client
-      // Documentation endpoint: POST /pix/cash-out
-      const evoData = await callEvoPay('/pix/cash-out', {
-        method: 'POST',
+      // camelCase aligned with EvoPay style; amount is the net payout
+      const evoData = await callEvoPay("/pix/cash-out", {
+        method: "POST",
         body: {
           amount: Number(netAmount.toFixed(2)),
-          pix_key: data.pixKey,
-          pix_key_type: data.pixKeyType,
-          external_id: String(tx.id),
-          merchant_id: process.env['EVOPAY_MERCHANT_ID'],
-          callback_url: `${process.env['SITE_URL'] || 'https://' + process.env['HOST']}/api/public/payment-webhook`
-        }
+          pixKey: data.pixKey,
+          pixKeyType: data.pixKeyType,
+          clientReference: String(tx.id),
+          callbackUrl: getWebhookUrl(),
+        },
       });
 
       if (evoData) {
         await (supabase.from("transactions") as any)
-          .update({ 
-            provider_id: evoData.id || evoData.transactionId,
-            metadata: { ...((tx as any).metadata || {}), provider_raw: evoData }
+          .update({
+            provider_id: evoData.id || evoData.transactionId || evoData.transaction_id,
+            metadata: { ...((tx as any).metadata || {}), provider_raw: evoData },
           } as any)
           .eq("id", tx.id);
       }
     } catch (err: any) {
       console.error("Withdrawal Audit Failure:", err);
-      // We don't throw here to avoid rolling back the wallet deduction 
-      // if it's just a communication issue, but in a real scenario 
-      // we might want more robust handling.
+      // Refund locked balance if provider rejected the cash-out
+      try {
+        await supabaseAdmin.rpc("adjust_wallet_balance", {
+          p_wallet_id: wallet.id,
+          p_amount: data.amount,
+        });
+        await (supabase.from("transactions") as any)
+          .update({ status: "failed", metadata: { error: err.message } } as any)
+          .eq("id", tx.id);
+      } catch (refundErr) {
+        console.error("Failed to refund after withdrawal error:", refundErr);
+      }
+      throw new Error(err.message || "Falha ao solicitar saque na adquirente.");
     }
 
     return {
       success: true,
       transactionId: tx.id,
-      netAmount
+      netAmount,
     };
   });
