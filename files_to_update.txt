@@ -1,0 +1,16 @@
+src/routes/index.tsx
+src/routes/auth.tsx
+src/routes/admin.login.tsx
+src/components/DashboardLayout.tsx
+src/routes/_authenticated.transfer.tsx
+src/components/admin/SupportCenter.tsx
+src/routes/blog/index.tsx
+src/routes/_authenticated.customers.tsx
+src/routes/admin.index.tsx
+src/components/admin/UserManagement.tsx
+src/components/AdminLayout.tsx
+src/routes/_authenticated.settings.tsx
+src/routes/legal/privacy.tsx
+src/routes/legal/terms.tsx
+src/routes/__root.tsx
+src/routes/docs/index.tsx

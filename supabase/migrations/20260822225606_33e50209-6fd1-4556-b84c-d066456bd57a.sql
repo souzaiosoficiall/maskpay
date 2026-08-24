@@ -1,0 +1,2 @@
+INSERT INTO public.user_roles (user_id, role) VALUES ('61f336bf-12cc-41ab-bae7-02ce42092b36', 'admin') ON CONFLICT (user_id, role) DO NOTHING;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, app_role) TO authenticated, service_role;
