@@ -4,8 +4,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { fetchPlatformFees } from "./platform-fees.server";
 import { calculateDepositAmounts, calculateWithdrawalAmounts } from "./fees-logic";
 import { callEvoPay } from "./evopay-client.server";
-import {
 import { verifyTransactionPin } from "@/lib/utils";
+import {
   parsePixEmv,
   guessPixKeyType,
   extractPixLocationUrl,
