@@ -74,15 +74,15 @@ function TransactionsPage() {
       case 'paid':
       case 'success':
       case 'approved':
-        return 'Concluído';
+        return 'REALIZADO';
       case 'pending':
-        return 'Pendente';
+        return 'PENDENTE';
       case 'failed':
       case 'rejected':
       case 'error':
-        return 'Falhou';
+        return 'FALHOU';
       case 'cancelled':
-        return 'Cancelado';
+        return 'CANCELADO';
       default:
         return status || 'Pendente';
     }
@@ -129,7 +129,7 @@ function TransactionsPage() {
                 <TableHead>Descrição</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Valor</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Situação</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>

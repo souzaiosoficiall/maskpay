@@ -102,7 +102,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
           className="flex items-center gap-3 px-4 py-3 rounded-2xl text-muted-foreground hover:bg-white/5 hover:text-white transition-all group mb-1 border"
         >
           <History className="h-5 w-5 min-w-5 group-hover:scale-110 transition-transform" />
-          {(isSidebarOpen || isMobile) && <span className="text-xs font-black uppercase tracking-widest">Logs</span>}
+          {(isSidebarOpen || isMobile) && <span className="text-xs font-black uppercase tracking-widest">Registros</span>}
         </Link>
 
         <Link

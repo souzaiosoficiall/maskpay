@@ -26,20 +26,25 @@ function RatesPage() {
     );
   }
 
+  const routeLabel = fees?.route === 'BLACK' ? 'BLACK' : 'WHITE';
+  const depositPct = fees?.deposit?.percentage ?? (routeLabel === 'BLACK' ? 7.9 : 2.49);
+  const depositFixed = fees?.deposit?.fixed ?? (routeLabel === 'BLACK' ? 1 : 0.4);
+  const withdrawFixed = fees?.withdrawal?.fixed ?? (routeLabel === 'BLACK' ? 1 : 0.8);
+
   const rates = [
     { 
-      title: 'PIX', 
-      rate: fees?.deposit.percentage ? `${fees.deposit.percentage}%` : '2.49%', 
-      fixed: `R$ ${fees?.deposit.fixed?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,40'}`, 
+      title: 'Recebimento PIX', 
+      rate: `${Number(depositPct).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`, 
+      fixed: `R$ ${Number(depositFixed).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
       icon: Wallet, 
-      description: 'Liberação instantânea' 
+      description: 'Taxa descontada do valor recebido' 
     },
     { 
       title: 'Saque PIX', 
-      rate: 'R$ 0,80', 
-      fixed: `R$ ${fees?.withdrawal.fixed?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,80'}`, 
+      rate: 'Taxa fixa', 
+      fixed: `R$ ${Number(withdrawFixed).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
       icon: Wallet, 
-      description: 'Taxa fixa por retirada' 
+      description: 'Descontada do valor enviado ao destinatário' 
     },
   ];
 
@@ -47,7 +52,15 @@ function RatesPage() {
     <div className="space-y-10 pb-16 font-sans">
       <div>
         <h1 className="text-4xl font-black tracking-tighter uppercase mb-2">Taxas</h1>
-        <p className="text-muted-foreground font-semibold text-base">Visualize as taxas aplicadas em cada modalidade de pagamento.</p>
+        <p className="text-muted-foreground font-semibold text-base">
+          Visualize as taxas aplicadas na sua conta
+          {fees?.route ? (
+            <span className="ml-2 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-white">
+              Rota {routeLabel}
+            </span>
+          ) : null}
+          . A taxa sempre desconta do valor — nunca é bônus.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

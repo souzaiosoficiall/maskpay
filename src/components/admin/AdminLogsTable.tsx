@@ -13,7 +13,7 @@ export function AdminLogsTable({ logs }: AdminLogsProps) {
         <TableHeader>
           <TableRow className="hover:bg-transparent border-white/5">
             <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 px-6">Data</TableHead>
-            <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Admin</TableHead>
+            <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Administrador</TableHead>
             <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Ação</TableHead>
             <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Alvo</TableHead>
             <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 px-6">Detalhes</TableHead>
@@ -26,7 +26,7 @@ export function AdminLogsTable({ logs }: AdminLogsProps) {
                 {format(new Date(log.created_at), 'dd/MM HH:mm')}
               </TableCell>
               <TableCell className="text-[10px] font-black uppercase text-white">
-                {log.profiles?.full_name || 'Admin'}
+                {log.profiles?.full_name || 'Administrador'}
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className="text-[8px] font-black uppercase">

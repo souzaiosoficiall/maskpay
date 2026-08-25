@@ -25,25 +25,28 @@ export const processTransaction = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const admin = supabaseAdmin;
 
-
-    // Note: Use context.supabase when authenticated.
-    // For this prototype, we'll demonstrate the structure.
-    
     const { walletId, type, amount, description, referenceId } = data;
 
+    // Ownership: wallet must belong to the authenticated user
+    const { data: ownedWallet, error: ownErr } = await supabase
+      .from('wallets')
+      .select('id, balance, user_id')
+      .eq('id', walletId)
+      .eq('user_id', userId)
+      .single();
+
+    if (ownErr || !ownedWallet) {
+      throw new Error("Carteira não encontrada ou sem permissão");
+    }
+
+    // Disallow arbitrary credit via this endpoint (only debit types)
+    if (type === 'cash_in' || type === 'transfer_in') {
+      throw new Error("Operação não permitida por este endpoint");
+    }
+
     // 1. Validate balance for cash_out/transfer_out
-    if (type === 'cash_out' || type === 'transfer_out') {
-      const { data: wallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('id', walletId)
-        .single();
-
-      if (walletError || !wallet) {
-        throw new Error("Carteira não encontrada");
-      }
-
-      if ((wallet.balance || 0) < amount) {
+    if (type === 'cash_out' || type === 'transfer_out' || type === 'fee') {
+      if ((ownedWallet.balance || 0) < amount) {
         throw new Error("Saldo insuficiente");
       }
     }

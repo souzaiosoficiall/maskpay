@@ -545,7 +545,7 @@ function DashboardPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="mb-1 text-[13px] font-medium text-muted-foreground">
-              Dashboard de usuário
+              Painel do usuário
             </p>
             <h1 className="text-3xl font-semibold tracking-tight text-white">MaskPay</h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -713,11 +713,23 @@ function DashboardPage() {
                         border: '1px solid rgba(255,255,255,0.08)',
                         borderRadius: 12,
                         fontSize: 12,
+                        color: '#fff',
                       }}
+                      formatter={(val: any) => [
+                        hideValues
+                          ? '••••'
+                          : Number(val || 0).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            }),
+                        'Valor',
+                      ]}
+                      labelFormatter={(label: any) => String(label ?? '')}
                     />
                     <Area
                       type="monotone"
                       dataKey="value"
+                      name="Valor"
                       stroke="#e2e8f0"
                       strokeWidth={2.5}
                       fill="url(#maskpayArea)"
@@ -730,7 +742,7 @@ function DashboardPage() {
             </div>
             <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                AVG{' '}
+                Média{' '}
                 <span className="font-semibold text-white">
                   {hideValues
                     ? '••••'
@@ -820,7 +832,7 @@ function DashboardPage() {
                   <tr className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-2.5 font-medium">Tipo</th>
                     <th className="px-4 py-2.5 font-medium">Data</th>
-                    <th className="px-4 py-2.5 font-medium">Status</th>
+                    <th className="px-4 py-2.5 font-medium">Situação</th>
                     <th className="px-4 py-2.5 text-right font-medium">Valor</th>
                   </tr>
                 </thead>

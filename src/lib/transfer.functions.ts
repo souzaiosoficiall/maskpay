@@ -57,17 +57,26 @@ export const executeInternalTransfer = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const admin = supabaseAdmin;
     const { senderWalletId, receiverWalletId, amount, description } = data;
+    const authUserId = context.userId;
 
     // We need the IDs for the RPC
     const { data: sender } = await (admin.from('wallets') as any).select('user_id').eq('id', senderWalletId).single();
     const { data: receiver } = await (admin.from('wallets') as any).select('user_id').eq('id', receiverWalletId).single();
     
     if (!sender?.user_id || !receiver?.user_id) throw new Error("Carteira não encontrada");
+
+    // CRITICAL: sender wallet must belong to the authenticated user (prevents IDOR drain)
+    if (sender.user_id !== authUserId) {
+      throw new Error("Carteira de origem inválida.");
+    }
+    if (receiver.user_id === authUserId) {
+      throw new Error("Não é possível transferir para a própria conta.");
+    }
     
     const { data: receiverProfile } = await (admin.from('profiles') as any).select('email').eq('id', receiver.user_id).single();
 
     const { error } = await admin.rpc('process_internal_transfer', {
-      p_sender_id: sender.user_id,
+      p_sender_id: authUserId,
       p_receiver_email: receiverProfile?.email || '',
       p_amount: amount,
       p_description: description || 'Transferência Interna'

@@ -26,7 +26,13 @@ export const Route = createFileRoute('/api/public/payment-webhook')({
               return new Response('Invalid signature', { status: 401 });
             }
           } else {
-            console.warn("[Webhook] EVOPAY_WEBHOOK_SECRET not set — skipping signature check");
+            // Final build: never accept unsigned webhooks in production
+            const isProd = process.env['NODE_ENV'] === 'production' || process.env['VERCEL_ENV'] === 'production';
+            if (isProd) {
+              console.error("[Webhook] EVOPAY_WEBHOOK_SECRET missing in production — rejecting");
+              return new Response('Webhook secret not configured', { status: 503 });
+            }
+            console.warn("[Webhook] EVOPAY_WEBHOOK_SECRET not set — skipping signature check (dev only)");
           }
 
           const payload = JSON.parse(bodyText);

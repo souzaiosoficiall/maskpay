@@ -183,7 +183,7 @@ function ExtractPage() {
                   <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-white/5">Descrição</th>
                   <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-white/5">Tipo</th>
                   <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-white/5 text-right">Valor</th>
-                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-white/5 text-center">Status</th>
+                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-white/5 text-center">Situação</th>
                   <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-white/5 text-center"></th>
                 </tr>
               </thead>

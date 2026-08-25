@@ -117,7 +117,7 @@ export function UserManagement({
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-white/5">
                   <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 px-6">Usuário</TableHead>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Status</TableHead>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Situação</TableHead>
                   <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Saldo</TableHead>
                   <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Rota</TableHead>
                   <TableHead className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Cadastro</TableHead>
@@ -294,7 +294,7 @@ export function UserManagement({
                   <div className="pt-6 border-t border-white/5">
                     <Label className="text-[9px] font-black uppercase text-muted-foreground/40 tracking-widest block mb-4">Ajuste de Saldo</Label>
                     <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-3">
-                      Use <span className="text-white/60">Definir</span> para colocar o valor exato (ex: 0,00 zera). Use <span className="text-white/60">Add</span> para somar ao saldo atual.
+                      Use <span className="text-white/60">Definir</span> para colocar o valor exato (ex: 0,00 zera). Use <span className="text-white/60">Adicionar</span> para somar ao saldo atual.
                     </p>
                     <div className="flex gap-2">
                       <input 
@@ -342,7 +342,7 @@ export function UserManagement({
                         variant="outline"
                         className="border-white/10 bg-white/5 text-white hover:bg-white/10 rounded-xl h-10 px-4 font-black uppercase text-[9px]"
                       >
-                        Add
+                        Adicionar
                       </Button>
                     </div>
                   </div>

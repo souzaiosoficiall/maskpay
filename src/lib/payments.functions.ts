@@ -137,7 +137,13 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
       await (supabase.from("transactions") as any)
         .update({
           provider_id: providerId,
-          metadata: { provider_raw: evoData, clientReference: String(tx.id) },
+          metadata: {
+            ...((tx as any).metadata || {}),
+            provider_raw: evoData,
+            clientReference: String(tx.id),
+            account_route: paymentRoute,
+            fee_route: feesResp.route,
+          },
         })
         .eq("id", tx.id);
 

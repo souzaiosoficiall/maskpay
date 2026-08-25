@@ -180,7 +180,7 @@ function TransferPage() {
                   <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 overflow-hidden p-2 group">
-                        <img src={maskPlatformAsset.url} alt="User" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
+                        <img src={maskPlatformAsset.url} alt="Usuário" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
                       </div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Recebedor</p>
