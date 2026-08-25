@@ -13,6 +13,7 @@ import {
   ArrowLeftRight,
   Webhook,
   Settings,
+  ShoppingBag,
   LogOut,
   FileCode2,
   BookOpen,
@@ -227,6 +228,7 @@ export default function DashboardLayout() {
 
         {[
           { label: 'Movimentações', to: '/transactions', icon: Webhook, lock: true },
+          { label: 'Checkout', to: '/checkout', icon: ShoppingBag, lock: true },
           { label: 'Taxas', to: '/rates', icon: Receipt, lock: true },
           { label: 'API', to: '/api-keys', icon: FileCode2, lock: true },
           { label: 'Documentação', to: '/docs', icon: BookOpen, lock: false },

@@ -31,6 +31,8 @@ import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedWebhooksRouteImport } from './routes/_authenticated.webhooks'
 import { Route as AuthenticatedWithdrawRouteImport } from './routes/_authenticated.withdraw'
 import { Route as AuthenticatedPayQrRouteImport } from './routes/_authenticated.pay-qr'
+import { Route as AuthenticatedCheckoutRouteImport } from './routes/_authenticated.checkout'
+import { Route as CSlugRouteImport } from './routes/c.$slug'
 import { Route as AdminIndexRouteImport } from './routes/aylla.index'
 import { Route as AdminLoginRouteImport } from './routes/aylla.login'
 import { Route as BlogIndexRouteImport } from './routes/blog/index'
@@ -149,6 +151,16 @@ const AuthenticatedPayQrRoute = AuthenticatedPayQrRouteImport.update({
   path: '/pay-qr',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCheckoutRoute = AuthenticatedCheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const CSlugRoute = CSlugRouteImport.update({
+  id: '/c/$slug',
+  path: '/c/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -207,6 +219,8 @@ export interface FileRoutesByFullPath {
   '/webhooks': typeof AuthenticatedWebhooksRoute
   '/withdraw': typeof AuthenticatedWithdrawRoute
   '/pay-qr': typeof AuthenticatedPayQrRoute
+  '/checkout': typeof AuthenticatedCheckoutRoute
+  '/c/$slug': typeof CSlugRoute
   '/aylla/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -235,6 +249,8 @@ export interface FileRoutesByTo {
   '/webhooks': typeof AuthenticatedWebhooksRoute
   '/withdraw': typeof AuthenticatedWithdrawRoute
   '/pay-qr': typeof AuthenticatedPayQrRoute
+  '/checkout': typeof AuthenticatedCheckoutRoute
+  '/c/$slug': typeof CSlugRoute
   '/aylla/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -590,6 +606,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedWebhooksRoute: AuthenticatedWebhooksRoute,
   AuthenticatedWithdrawRoute: AuthenticatedWithdrawRoute,
   AuthenticatedPayQrRoute: AuthenticatedPayQrRoute,
+  AuthenticatedCheckoutRoute: AuthenticatedCheckoutRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -610,6 +627,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CSlugRoute: CSlugRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
   AdminDecoyRoute: AdminDecoyRoute,

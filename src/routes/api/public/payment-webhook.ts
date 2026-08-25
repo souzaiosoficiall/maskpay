@@ -50,7 +50,7 @@ export const Route = createFileRoute('/api/public/payment-webhook')({
             if (providerId) {
               const byProvider = await (supabaseAdmin
                 .from('transactions')
-                .select('id, status, wallet_id, amount, net_amount, fee_amount, type') as any)
+                .select('id, status, wallet_id, amount, net_amount, fee_amount, type, metadata') as any)
                 .eq('provider_id', providerId)
                 .maybeSingle();
               if (byProvider.data) return byProvider.data;
@@ -58,7 +58,7 @@ export const Route = createFileRoute('/api/public/payment-webhook')({
               // Fallback: clientReference may be our internal tx id
               const byId = await (supabaseAdmin
                 .from('transactions')
-                .select('id, status, wallet_id, amount, net_amount, fee_amount, type') as any)
+                .select('id, status, wallet_id, amount, net_amount, fee_amount, type, metadata') as any)
                 .eq('id', providerId)
                 .maybeSingle();
               if (byId.data) return byId.data;
@@ -103,6 +103,18 @@ export const Route = createFileRoute('/api/public/payment-webhook')({
                   p_wallet_id: (existingTx as any).wallet_id,
                   p_amount: credit,
                 });
+
+                try {
+                  const meta = (existingTx as any).metadata || {};
+                  const orderId = meta.checkout_order_id;
+                  if (orderId) {
+                    await (supabaseAdmin.from('checkout_orders') as any)
+                      .update({ status: 'paid' })
+                      .eq('id', orderId);
+                  }
+                } catch (orderErr) {
+                  console.error('[Webhook] checkout_orders update failed:', orderErr);
+                }
 
                 try {
                   const { notifyPixDepositConfirmed } = await import('@/lib/push-send.server');
