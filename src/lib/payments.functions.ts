@@ -5,6 +5,7 @@ import { fetchPlatformFees } from "./platform-fees.server";
 import { calculateDepositAmounts, calculateWithdrawalAmounts } from "./fees-logic";
 import { callEvoPay } from "./evopay-client.server";
 import {
+import { verifyTransactionPin } from "@/lib/utils";
   parsePixEmv,
   guessPixKeyType,
   extractPixLocationUrl,
@@ -193,7 +194,7 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
       .eq("id", userId)
       .single();
 
-    if ((profile as any)?.transaction_password_hash !== data.transactionPassword) {
+    if (!(await verifyTransactionPin((profile as any)?.transaction_password_hash, data.transactionPassword))) {
       throw new Error("Senha de transação incorreta.");
     }
 
@@ -315,7 +316,7 @@ export const payPixQrCode = createServerFn({ method: "POST" })
       .eq("id", userId)
       .single();
 
-    if ((profile as any)?.transaction_password_hash !== data.transactionPassword) {
+    if (!(await verifyTransactionPin((profile as any)?.transaction_password_hash, data.transactionPassword))) {
       throw new Error("Senha de transação incorreta.");
     }
 

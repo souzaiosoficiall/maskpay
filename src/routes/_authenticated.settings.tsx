@@ -173,19 +173,19 @@ function SettingsPage() {
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">E-mail</Label>
                   <div className="bg-white/5 border border-white/10 rounded-2xl h-16 flex items-center px-6 font-bold text-white break-all">
-                    {profile?.email || 'Não informado'}
+                    {profile?.email ? maskEmail(profile.email) : 'Não informado'}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">WhatsApp / Telefone</Label>
                   <div className="bg-white/5 border border-white/10 rounded-2xl h-16 flex items-center px-6 font-bold text-white">
-                    {profile?.phone?.trim() ? profile.phone : 'Não informado'}
+                    {profile?.phone?.trim() ? maskPhone(profile.phone) : 'Não informado'}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">CPF / CNPJ</Label>
                   <div className="bg-white/5 border border-white/10 rounded-2xl h-16 flex items-center px-6 font-bold text-white">
-                    {profile?.document?.trim() ? profile.document : 'Não informado'}
+                    {profile?.document?.trim() ? maskDocument(profile.document) : 'Não informado'}
                   </div>
                 </div>
               </div>

@@ -15,13 +15,14 @@ import { AuthVisualPanel } from '@/components/AuthVisualPanel';
 import { useServerFn } from '@tanstack/react-start';
 import { validateCPFAction } from '@/lib/identity.functions';
 import { syncProfileAfterSignup, checkRegistrationAvailability } from '@/lib/register.functions';
+import { requestPasswordReset } from '@/lib/password-reset.functions';
 
 
 export const Route = createFileRoute('/auth')({
   component: AuthPage,
   validateSearch: (search: Record<string, unknown>) => {
     return {
-      mode: (search['mode'] as 'login' | 'register') || 'login',
+      mode: (search['mode'] as 'login' | 'register' | 'forgot') || 'login',
     };
   },
 });
@@ -30,6 +31,8 @@ function AuthPage() {
   const search = Route.useSearch();
   const mode = search['mode'];
   const isLogin = mode === 'login';
+  const isForgot = mode === 'forgot';
+  const isRegister = mode === 'register';
 
   // Already logged in → skip login screen (session restored from localStorage)
   // If security lock is active (DevTools was opened), force logout and stay on login.
@@ -71,10 +74,17 @@ function AuthPage() {
   const validateCPFServer = useServerFn(validateCPFAction);
   const syncProfileServer = useServerFn(syncProfileAfterSignup);
   const checkAvailabilityServer = useServerFn(checkRegistrationAvailability);
+  const requestResetServer = useServerFn(requestPasswordReset);
   const [isValidatingCPF, setIsValidatingCPF] = useState(false);
   const [isCPFVerified, setIsCPFVerified] = useState(false);
   /** Seconds left before resend confirmation email is allowed (0 = free to resend) */
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [forgotSent, setForgotSent] = useState(false);
+
+  useEffect(() => {
+    setForgotSent(false);
+    setError('');
+  }, [mode]);
 
 
   const maskPhone = (value: string) => {
@@ -135,6 +145,25 @@ function AuthPage() {
           setIsLoading(false);
           return;
         }
+      }
+
+      if (isForgot) {
+        if (forgotSent) {
+          setForgotSent(false);
+          setIsLoading(false);
+          navigate({ to: '/auth', search: { mode: 'login' } });
+          return;
+        }
+        if (!email.trim()) {
+          setError('Informe seu e-mail');
+          setIsLoading(false);
+          return;
+        }
+        const result = await requestResetServer({ data: { email: email.trim() } });
+        toast.success(result?.message || 'Se o e-mail existir, enviaremos o link de redefinição.');
+        setForgotSent(true);
+        setIsLoading(false);
+        return;
       }
 
       if (isLogin) {
@@ -392,14 +421,24 @@ function AuthPage() {
           </Link>
           
           <h2 className="text-3xl md:text-4xl font-black tracking-tight text-center mb-2 uppercase">
-            {awaitingEmailConfirm ? 'Verifique seu e-mail' : isLogin ? 'Login' : 'Cadastro'}
+            {awaitingEmailConfirm
+              ? 'Verifique seu e-mail'
+              : isForgot
+                ? (forgotSent ? 'E-mail enviado' : 'Recuperar senha')
+                : isLogin
+                  ? 'Login'
+                  : 'Cadastro'}
           </h2>
           <p className="text-muted-foreground/60 text-center text-[10px] md:text-sm font-medium">
             {awaitingEmailConfirm
               ? 'Quase lá — confirme o endereço para continuar'
-              : isLogin
-                ? 'Acesse o dashboard de sua conta'
-                : 'Junte-se à nova era financeira'}
+              : isForgot
+                ? (forgotSent
+                    ? 'Confira sua caixa de entrada e o spam'
+                    : 'Enviaremos um link para criar uma nova senha')
+                : isLogin
+                  ? 'Acesse sua conta MaskPay'
+                  : 'Junte-se à nova era financeira'}
           </p>
         </div>
 
@@ -471,7 +510,7 @@ function AuthPage() {
           </Card>
         )}
 
-        {!awaitingEmailConfirm && !isLogin && (
+        {!awaitingEmailConfirm && isRegister && (
           <div className="flex items-center justify-center gap-2 mb-6 md:mb-8">
             {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex items-center">
@@ -491,7 +530,53 @@ function AuthPage() {
           <CardContent className="pt-6 md:pt-8 px-6 md:px-8 pb-8 md:pb-10">
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {isLogin ? (
+              {isForgot ? (
+                <>
+                  {forgotSent ? (
+                    <div className="space-y-4 text-center py-2">
+                      <p className="text-sm font-medium text-muted-foreground leading-relaxed">
+                        Se <strong className="text-white break-all">{email.trim()}</strong> estiver
+                        cadastrado, enviamos um link para redefinir a senha. Confira também a pasta de spam.
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setForgotSent(false);
+                          setError('');
+                        }}
+                        variant="outline"
+                        className="w-full h-12 rounded-xl border-white/10 text-xs font-black uppercase tracking-widest"
+                      >
+                        Enviar novamente
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="forgot-email" className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">E-mail da conta</Label>
+                        <Input
+                          id="forgot-email"
+                          type="email"
+                          placeholder="nome@exemplo.com"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="bg-white/5 h-14 rounded-xl border-white/5 focus:border-primary/50 transition-all px-5"
+                          autoFocus
+                        />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Enviaremos um e-mail com um link seguro para você criar uma nova senha.
+                      </p>
+                    </>
+                  )}
+                  {error && (
+                    <p className="text-red-500 text-[10px] font-bold uppercase tracking-wider text-center pt-2">
+                      {error}
+                    </p>
+                  )}
+                </>
+              ) : isLogin ? (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">E-mail</Label>
@@ -508,7 +593,7 @@ function AuthPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="password" className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Senha</Label>
-                      <Link to="/auth" search={{ mode: 'login' }} className="text-[10px] font-bold text-primary hover:underline uppercase tracking-widest">
+                      <Link to="/auth" search={{ mode: 'forgot' }} className="text-[10px] font-bold text-primary hover:underline uppercase tracking-widest">
                         Esqueceu?
                       </Link>
                     </div>
@@ -771,7 +856,7 @@ function AuthPage() {
                   <Loader2 className="animate-spin h-4 w-4" />
                 ) : (
                   <>
-                    {isLogin ? 'Entrar' : step === 4 ? 'Finalizar' : 'Continuar'}
+                    {isForgot ? (forgotSent ? 'Voltar ao login' : 'Enviar link') : isLogin ? 'Entrar' : step === 4 ? 'Finalizar' : 'Continuar'}
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -782,18 +867,18 @@ function AuthPage() {
 
             <div className="mt-8 flex flex-col items-center gap-4">
               <div className="text-[10px] text-center text-muted-foreground/60 font-bold uppercase tracking-[0.1em]">
-                {isLogin ? 'Sem conta?' : 'Já possui conta?'}
+                {isForgot ? 'Lembrou a senha?' : isLogin ? 'Sem conta?' : 'Já possui conta?'}
                 <button 
                   className="ml-2 text-primary font-black hover:underline" 
                   onClick={() => {
                     navigate({ 
                       to: '/auth', 
-                      search: { mode: isLogin ? 'register' : 'login' } 
+                      search: { mode: isForgot ? 'login' : isLogin ? 'register' : 'login' } 
                     });
                     setStep(1);
                   }}
                 >
-                  {isLogin ? 'Cadastrar' : 'Entrar'}
+                  {isForgot ? 'Entrar' : isLogin ? 'Cadastrar' : 'Entrar'}
                 </button>
               </div>
             </div>

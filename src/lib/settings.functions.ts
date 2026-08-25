@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { maskEmail, maskPhone, maskDocument } from "./utils";
+import { maskEmail, maskPhone, maskDocument, sha256Hex } from "./utils";
 import type { Tables } from "@/integrations/supabase/types";
 
 export type ProfileWithRole = Tables<'profiles'> & { role: 'admin' | 'user' };
@@ -288,11 +288,10 @@ export const updateTransactionPassword = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // In a real app, we would hash this. For this demo, we store it in profiles.
-    // Note: use pgcrypto for hashing if needed.
+    const hashed = await sha256Hex(data.newPassword);
     const { error } = await supabase
       .from('profiles')
-      .update({ transaction_password_hash: data.newPassword })
+      .update({ transaction_password_hash: hashed })
       .eq('id', userId);
 
     if (error) throw new Error(error.message);

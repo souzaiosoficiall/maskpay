@@ -28,6 +28,11 @@ import {
   saveIntegration, 
   deleteIntegration 
 } from '@/lib/integrations.functions';
+import {
+  listApiKeys,
+  createApiKey,
+  revokeApiKey,
+} from '@/lib/api-keys.functions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -50,8 +55,12 @@ function ApiKeysPage() {
   const fetchUserIntegrations = useServerFn(getUserIntegrations);
   const saveUserIntegration = useServerFn(saveIntegration);
   const removeUserIntegration = useServerFn(deleteIntegration);
-  const [clientId, setClientId] = useState<string>('');
-  const [secretId, setSecretId] = useState<string>('');
+  const fetchApiKeys = useServerFn(listApiKeys);
+  const doCreateApiKey = useServerFn(createApiKey);
+  const doRevokeApiKey = useServerFn(revokeApiKey);
+
+  const [freshClientId, setFreshClientId] = useState('');
+  const [freshSecret, setFreshSecret] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -66,6 +75,13 @@ function ApiKeysPage() {
     queryFn: () => fetchUserIntegrations(),
     enabled: sessionReady,
     retry: false,
+  });
+
+  const { data: apiKeys = [], isLoading: loadingKeys } = useQuery({
+    queryKey: ['api-keys'],
+    queryFn: () => fetchApiKeys({}),
+    enabled: sessionReady,
+    staleTime: 15_000,
   });
 
   const saveMutation = useMutation({
@@ -93,14 +109,33 @@ function ApiKeysPage() {
     }
   });
 
-  const generateCredentials = () => {
+  const generateCredentials = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      setClientId('mask_' + Math.random().toString(36).substring(2, 15));
-      setSecretId('sk_live_' + Math.random().toString(36).substring(2, 30));
+    setFreshSecret('');
+    setFreshClientId('');
+    try {
+      const result = await doCreateApiKey({ data: {} });
+      setFreshClientId(result.clientId);
+      setFreshSecret(result.secret);
+      setShowSecret(true);
+      queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+      toast.success('Credenciais geradas! Copie o Secret agora — ele não será mostrado de novo.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Falha ao gerar chaves de API');
+    } finally {
       setIsGenerating(false);
-      toast.success('Credenciais geradas com sucesso!');
-    }, 1000);
+    }
+  };
+
+  const handleRevoke = async (id: string) => {
+    if (!confirm('Revogar esta chave? Integrações que a usam deixarão de funcionar.')) return;
+    try {
+      await doRevokeApiKey({ data: { id } });
+      queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+      toast.success('Chave revogada.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao revogar chave');
+    }
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -126,12 +161,8 @@ function ApiKeysPage() {
   };
 
   const handleOpenModal = (provider: 'utmify' | 'google') => {
-    const existing = (userIntegrations as any[]).find((int: any) => int.provider === provider);
-    if (existing) {
-      setTokenValue(provider === 'utmify' ? existing.config?.['token'] : existing.config?.['googleId']);
-    } else {
-      setTokenValue('');
-    }
+    // Always start empty — listed tokens are masked; user must re-enter to update
+    setTokenValue('');
     setActiveModal(provider);
   };
 
@@ -196,12 +227,12 @@ function ApiKeysPage() {
                   <input 
                     type="text" 
                     readOnly 
-                    value={clientId || '••••••••••••••••'} 
+                    value={freshClientId || '••••••••••••••••'} 
                     className="w-full bg-background border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-sm font-mono tracking-wider focus:outline-none focus:border-white/20 transition-all text-white/80"
                   />
-                  {clientId && (
+                  {freshClientId && (
                     <button 
-                      onClick={() => copyToClipboard(clientId, 'Client ID')}
+                      onClick={() => copyToClipboard(freshClientId, 'Client ID')}
                       className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-white transition-colors"
                     >
                       <Copy className="h-4 w-4" />
@@ -211,7 +242,7 @@ function ApiKeysPage() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Secret ID</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Secret</label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Shield className="h-4 w-4 text-white/20 group-hover:text-white/40 transition-colors" />
@@ -219,10 +250,10 @@ function ApiKeysPage() {
                   <input 
                     type={showSecret ? "text" : "password"} 
                     readOnly 
-                    value={secretId || '••••••••••••••••••••••••••••'} 
+                    value={freshSecret || '••••••••••••••••••••••••••••'} 
                     className="w-full bg-background border border-white/10 rounded-2xl py-4 pl-12 pr-24 text-sm font-mono tracking-wider focus:outline-none focus:border-white/20 transition-all text-white/80"
                   />
-                  {secretId && (
+                  {freshSecret && (
                     <div className="absolute inset-y-0 right-0 pr-4 flex items-center gap-3">
                       <button 
                         onClick={() => setShowSecret(!showSecret)}
@@ -231,7 +262,7 @@ function ApiKeysPage() {
                         {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                       <button 
-                        onClick={() => copyToClipboard(secretId, 'Secret ID')}
+                        onClick={() => copyToClipboard(freshSecret, 'Secret')}
                         className="text-muted-foreground hover:text-white transition-colors"
                       >
                         <Copy className="h-4 w-4" />
@@ -253,8 +284,46 @@ function ApiKeysPage() {
                 ) : (
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
-                {clientId ? 'Regerar Credenciais' : 'Gerar Minhas Credenciais'}
+                {freshClientId ? 'Gerar nova chave' : 'Gerar Minhas Credenciais'}
               </Button>
+            </div>
+
+            {freshSecret && (
+              <p className="text-center text-[11px] font-medium text-amber-400/90">
+                Secret visível apenas agora. Copie e guarde em local seguro.
+              </p>
+            )}
+
+            <div className="space-y-3 pt-2 border-t border-white/5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Chaves ativas {loadingKeys ? '…' : `(${(apiKeys as any[]).length})`}
+              </p>
+              {(apiKeys as any[]).length === 0 && !loadingKeys && (
+                <p className="text-xs text-muted-foreground">Nenhuma chave gerada ainda.</p>
+              )}
+              {(apiKeys as any[]).map((k: any) => (
+                <div
+                  key={k.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm text-white/90 truncate">{k.clientId}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Criada em {k.createdAt ? new Date(k.createdAt).toLocaleString('pt-BR') : '—'}
+                      {k.lastUsedAt ? ` · Último uso ${new Date(k.lastUsedAt).toLocaleString('pt-BR')}` : ''}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRevoke(k.id)}
+                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" /> Revogar
+                  </Button>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

@@ -17,7 +17,19 @@ export const getUserIntegrations = createServerFn({ method: "GET" })
       return [];
     }
 
-    return data || [];
+    // Never send full third-party tokens to the browser when listing
+    return (data || []).map((row: any) => {
+      const config = { ...(row.config || {}) };
+      if (typeof config.token === "string" && config.token.length > 6) {
+        config.token = `${config.token.slice(0, 4)}${"*".repeat(8)}${config.token.slice(-2)}`;
+        config._masked = true;
+      }
+      if (typeof config.googleId === "string" && config.googleId.length > 6) {
+        config.googleId = `${config.googleId.slice(0, 4)}${"*".repeat(6)}`;
+        config._masked = true;
+      }
+      return { ...row, config };
+    });
   });
 
 export const saveIntegration = createServerFn({ method: "POST" })

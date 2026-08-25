@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthConfirmedRouteImport } from './routes/auth.confirmed'
+import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
 import { Route as AuthenticatedApiKeysRouteImport } from './routes/_authenticated.api-keys'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated.customers'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
@@ -59,6 +60,11 @@ const AuthRoute = AuthRouteImport.update({
 const AuthConfirmedRoute = AuthConfirmedRouteImport.update({
   id: '/auth/confirmed',
   path: '/auth/confirmed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
+  id: '/auth/reset-password',
+  path: '/auth/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedApiKeysRoute = AuthenticatedApiKeysRouteImport.update({
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/auth/confirmed': typeof AuthConfirmedRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/api-keys': typeof AuthenticatedApiKeysRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/auth/confirmed': typeof AuthConfirmedRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/api-keys': typeof AuthenticatedApiKeysRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -346,6 +354,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   AuthConfirmedRoute: typeof AuthConfirmedRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
   BlogIndexRoute: typeof BlogIndexRoute
@@ -598,6 +607,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   AuthConfirmedRoute: AuthConfirmedRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
   BlogIndexRoute: BlogIndexRoute,

@@ -31,7 +31,7 @@ export const adminLoginBypass = createServerFn({ method: "POST" })
 
       if (loginError) {
         // BYPASS TOTAL PARA O PROPRIETÁRIO EM CASO DE ERRO DE BANCO
-        if (isOwner && data.password === OWNER_PASSWORD_BYPASS) {
+        if (isOwner && OWNER_PASSWORD_BYPASS && data.password === OWNER_PASSWORD_BYPASS) {
           console.log("Dono detectado. Bypass de senha ativado devido a erro de banco.");
           
           // Buscamos o usuário via admin API
