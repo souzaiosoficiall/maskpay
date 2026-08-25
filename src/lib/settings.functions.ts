@@ -147,6 +147,12 @@ export const getProfile = createServerFn({ method: "GET" })
         // Network/API errors: still allow existing profile through
         console.error('[getProfile] auth existence check failed:', e);
       }
+
+      // Blocked / rejected accounts must not keep access — force client logout
+      if (data.status === 'blocked' || data.status === 'rejected') {
+        throw new Error('ACCOUNT_DELETED');
+      }
+
       return maskPII({ ...data, role }, role);
     }
 

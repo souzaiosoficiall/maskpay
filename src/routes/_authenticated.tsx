@@ -118,11 +118,17 @@ function AuthenticatedLayout() {
     isLoading: isProfileLoading,
     isError: isProfileError,
     error: profileError,
+    refetch: refetchProfile,
   } = useQuery({
     queryKey: ['profile'],
     // Only fetch profile after we know the Auth user still exists
     queryFn: () => fetchProfile({}),
     enabled: sessionReady && authValidated,
+    // Keep profile fresh so admin delete/block is detected quickly
+    staleTime: 15_000,
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     retry: (failureCount, err) => {
       // Never retry deleted-account errors
       if (isAccountDeletedError(err)) return false;
@@ -133,17 +139,21 @@ function AuthenticatedLayout() {
     isLoading: boolean;
     isError: boolean;
     error: unknown;
+    refetch: () => void;
   };
 
   // Server-side validation: JWT may still be valid after admin deleteUser.
   // getUser() hits Auth API and fails when the user no longer exists.
+  // Re-runs on route change, tab focus and on a short interval so kick is fast.
   useEffect(() => {
     if (!sessionReady) return;
 
     let cancelled = false;
-    setAuthValidated(false);
+    let firstRun = true;
 
-    (async () => {
+    const validateAuth = async () => {
+      if (cancelled || loggingOutRef.current) return;
+
       const { data: sessionData } = await supabase.auth.getSession();
       if (cancelled) return;
 
@@ -152,6 +162,7 @@ function AuthenticatedLayout() {
         return;
       }
 
+      // Always hit the Auth API — local JWT can outlive a deleted/blocked account
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (cancelled) return;
 
@@ -161,28 +172,57 @@ function AuthenticatedLayout() {
         return;
       }
 
-      doUpdateLastAccess({}).catch(() => undefined);
+      // On first successful validation only: update last access + inactivity window
+      if (firstRun) {
+        firstRun = false;
+        doUpdateLastAccess({}).catch(() => undefined);
 
-      const lastAccess = window.localStorage.getItem('maskpay-login-timestamp');
-      const now = Date.now();
-      const twentyFourHours = 24 * 60 * 60 * 1000;
+        const lastAccess = window.localStorage.getItem('maskpay-login-timestamp');
+        const now = Date.now();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
 
-      if (lastAccess) {
-        const elapsed = now - parseInt(lastAccess, 10);
-        if (!Number.isNaN(elapsed) && elapsed > twentyFourHours) {
-          console.log('[AuthenticatedLayout] Session expired (>24h inactivity).');
-          forceOut();
-          return;
+        if (lastAccess) {
+          const elapsed = now - parseInt(lastAccess, 10);
+          if (!Number.isNaN(elapsed) && elapsed > twentyFourHours) {
+            console.log('[AuthenticatedLayout] Session expired (>24h inactivity).');
+            forceOut();
+            return;
+          }
+        }
+
+        window.localStorage.setItem('maskpay-login-timestamp', String(now));
+        if (!cancelled) setAuthValidated(true);
+      }
+    };
+
+    // Immediate check (blocks Face ID / dashboard until we know the account still exists)
+    setAuthValidated(false);
+    validateAuth();
+
+    // Re-validate when the PWA/tab becomes visible again
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        validateAuth();
+        try {
+          refetchProfile();
+        } catch {
+          // ignore
         }
       }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
-      window.localStorage.setItem('maskpay-login-timestamp', String(now));
-      if (!cancelled) setAuthValidated(true);
-    })();
+    // Short polling while the user stays on authenticated routes
+    const intervalId = window.setInterval(() => {
+      validateAuth();
+    }, 25_000);
 
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(intervalId);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refetchProfile is stable; avoid re-binding interval
   }, [sessionReady, location.pathname, doUpdateLastAccess, forceOut]);
 
   // Profile fetch failed because account was deleted by admin

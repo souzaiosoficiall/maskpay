@@ -282,11 +282,20 @@ export const deleteUser = createServerFn({ method: "POST" })
     const userId = data.userId as string;
 
     // Best-effort: invalidate all sessions for this user before deleting
+    // so the client JWT stops working as soon as possible
     try {
       // @ts-expect-error — available on recent supabase-js admin API
       await supabaseAdmin.auth.admin.signOut(userId, 'global');
     } catch {
       // ignore if API not supported
+    }
+    try {
+      // Ban briefly then delete — helps some clients drop the session faster
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        ban_duration: '876000h',
+      });
+    } catch {
+      // ignore if already gone / API unavailable
     }
 
     // Explicit cleanup of related rows (in case some FKs are ON DELETE SET NULL / missing cascade)
