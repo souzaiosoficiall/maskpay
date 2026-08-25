@@ -78,47 +78,67 @@ export const createNotification = createServerFn({ method: "POST" })
 
 export const dismissNotification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => z.object({ notification_id: z.string() }).parse(data))
+  .validator((data: unknown) => z.object({ notification_id: z.string().uuid() }).parse(data))
   .handler(async ({ data: input, context }) => {
-    const { userId, supabase } = context as { userId: string; supabase: any };
+    const { userId } = context as { userId: string; supabase: any };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data, error } = await (supabase as any)
+    // Service role so RLS never blocks "don't show again"
+    const { data, error } = await (supabaseAdmin as any)
       .from("notification_dismissals")
-      .upsert({
-        notification_id: input.notification_id,
-        user_id: userId,
-        dismissed_at: new Date().toISOString(),
-      }, { onConflict: 'notification_id,user_id' })
+      .upsert(
+        {
+          notification_id: input.notification_id,
+          user_id: userId,
+          dismissed_at: new Date().toISOString(),
+        },
+        { onConflict: "notification_id,user_id" },
+      )
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      // Fallback without onConflict (some DBs lack the unique index name)
+      const { error: insertError } = await (supabaseAdmin as any)
+        .from("notification_dismissals")
+        .insert({
+          notification_id: input.notification_id,
+          user_id: userId,
+          dismissed_at: new Date().toISOString(),
+        });
+      if (insertError && !/duplicate|unique/i.test(insertError.message || "")) {
+        throw new Error(insertError.message || "Erro ao dispensar aviso");
+      }
+    }
+    return data ?? { success: true };
   });
 
 export const getActiveNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId, supabase } = context as { userId: string; supabase: any };
+    const { userId } = context as { userId: string; supabase: any };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Get active notifications that the user hasn't dismissed
-    const { data, error } = await (supabase as any)
+    // Active notifications
+    const { data: notifications, error } = await (supabaseAdmin as any)
       .from("notifications")
-      .select(`
-        *,
-        notification_dismissals (user_id)
-      `)
-      .eq("is_active", true);
+      .select("id, title, description, is_active, created_at, target_type")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
 
-    if (error) throw error;
-    
-    // Filter notifications where user_id in notification_dismissals matches current user
-    const filtered = (data || []).filter((n: any) => {
-      const dismissals = n.notification_dismissals || [];
-      return !dismissals.some((d: any) => d.user_id === userId);
-    });
+    if (error) throw new Error(error.message);
 
-    return filtered;
+    // This user's dismissals (reliable filter — avoids nested RLS issues)
+    const { data: dismissals } = await (supabaseAdmin as any)
+      .from("notification_dismissals")
+      .select("notification_id")
+      .eq("user_id", userId);
+
+    const dismissedIds = new Set(
+      (dismissals || []).map((d: any) => d.notification_id).filter(Boolean),
+    );
+
+    return (notifications || []).filter((n: any) => !dismissedIds.has(n.id));
   });
 
 export const deleteNotification = createServerFn({ method: "POST" })

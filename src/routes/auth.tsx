@@ -261,7 +261,8 @@ function AuthPage() {
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${siteUrl}/auth?mode=login`,
+          // After confirming the email, land on the success screen (then user goes to login)
+          emailRedirectTo: `${siteUrl}/auth/confirmed`,
           data: {
             full_name: fullName,
             document: document,
@@ -340,7 +341,7 @@ function AuthPage() {
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email: pendingConfirmEmail,
-        options: { emailRedirectTo: `${siteUrl}/auth?mode=login` },
+        options: { emailRedirectTo: `${siteUrl}/auth/confirmed` },
       });
       if (resendError) throw resendError;
       toast.success('E-mail de confirmação reenviado. Confira também a pasta de spam.');

@@ -23,11 +23,20 @@ export function NotificationManager() {
     refetchInterval: 60_000, // safety net polling every 60s
   });
 
-  // Load initial notifications
+  // Load initial notifications (respect local + server dismissals)
   useEffect(() => {
-    if (initialNotifications) {
-      setActiveNotifications(initialNotifications);
+    if (!initialNotifications) return;
+    let localDismissed: string[] = [];
+    try {
+      const raw = window.localStorage.getItem('maskpay-dismissed-notifications');
+      localDismissed = raw ? JSON.parse(raw) : [];
+    } catch {
+      localDismissed = [];
     }
+    const filtered = initialNotifications.filter(
+      (n: any) => n?.id && !localDismissed.includes(String(n.id)) && !shownIdsRef.current.has(String(n.id)),
+    );
+    setActiveNotifications(filtered);
   }, [initialNotifications]);
 
   const pushNotification = useCallback((newNotif: any) => {
@@ -152,18 +161,34 @@ export function NotificationManager() {
 
   const handleClose = async (dontShowAgain: boolean) => {
     const closedNotifId = currentNotification?.id;
-    
-    if (dontShowAgain && closedNotifId && !String(closedNotifId).startsWith('push-')) {
-      try {
-        await doDismiss({ data: { notification_id: closedNotifId } });
-      } catch (err) {
-        console.error("Erro ao dispensar notificação:", err);
-      }
-    }
-    
+
+    // Always remove from local queue so it doesn't flash again this session
     setActiveNotifications((prev) => prev.filter((n) => n.id !== closedNotifId));
     setIsModalOpen(false);
     setCurrentNotification(null);
+    if (closedNotifId) shownIdsRef.current.add(String(closedNotifId));
+
+    if (dontShowAgain && closedNotifId && !String(closedNotifId).startsWith('push-')) {
+      // Persist locally immediately (survives refresh even if API is slow/fails)
+      try {
+        const key = 'maskpay-dismissed-notifications';
+        const raw = window.localStorage.getItem(key);
+        const list: string[] = raw ? JSON.parse(raw) : [];
+        if (!list.includes(String(closedNotifId))) {
+          list.push(String(closedNotifId));
+          window.localStorage.setItem(key, JSON.stringify(list));
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        await doDismiss({ data: { notification_id: closedNotifId } });
+        await queryClient.invalidateQueries({ queryKey: ['active_notifications'] });
+      } catch (err) {
+        console.error('Erro ao dispensar notificação:', err);
+      }
+    }
   };
 
   if (!currentNotification) return null;

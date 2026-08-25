@@ -157,8 +157,42 @@ function Calculator() {
 
 
 export const Route = createFileRoute('/')({
-  component: LandingPage,
+  component: IndexEntry,
 });
+
+/** Email confirmation links may land on Site URL (/?code=...). Forward to success page. */
+function IndexEntry() {
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+      const err = url.searchParams.get('error') || url.searchParams.get('error_description');
+      if (code || err) {
+        window.location.replace(`/auth/confirmed${url.search}`);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // If URL has auth code, show a short loader while redirecting
+  if (typeof window !== 'undefined') {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('code') || url.searchParams.get('error')) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+          </div>
+        );
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  return <LandingPage />;
+}
 
 function AnimatedNumber({ value }: { value: number }) {
   const motionValue = useMotionValue(value);

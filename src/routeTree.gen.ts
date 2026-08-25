@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthConfirmedRouteImport } from './routes/auth.confirmed'
 import { Route as AuthenticatedApiKeysRouteImport } from './routes/_authenticated.api-keys'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated.customers'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
@@ -53,6 +54,11 @@ const AdminRoute = AdminRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthConfirmedRoute = AuthConfirmedRouteImport.update({
+  id: '/auth/confirmed',
+  path: '/auth/confirmed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedApiKeysRoute = AuthenticatedApiKeysRouteImport.update({
@@ -171,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/auth/confirmed': typeof AuthConfirmedRoute
   '/api-keys': typeof AuthenticatedApiKeysRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -197,6 +204,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/auth/confirmed': typeof AuthConfirmedRoute
   '/api-keys': typeof AuthenticatedApiKeysRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -337,6 +345,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  AuthConfirmedRoute: typeof AuthConfirmedRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
   BlogIndexRoute: typeof BlogIndexRoute
@@ -588,6 +597,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  AuthConfirmedRoute: AuthConfirmedRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
   BlogIndexRoute: BlogIndexRoute,
