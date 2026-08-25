@@ -62,6 +62,9 @@ function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  /** After signup: wait for user to confirm email before accessing the app */
+  const [awaitingEmailConfirm, setAwaitingEmailConfirm] = useState(false);
+  const [pendingConfirmEmail, setPendingConfirmEmail] = useState('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const validateCPFServer = useServerFn(validateCPFAction);
@@ -156,8 +159,13 @@ function AuthPage() {
             } else {
               msg = 'Este e-mail não está cadastrado ou a senha está incorreta.';
             }
-          } else if (msg === 'Email not confirmed') {
-            msg = 'Este e-mail não está cadastrado ou a senha está incorreta.';
+          } else if (msg === 'Email not confirmed' || msg.toLowerCase().includes('email not confirmed')) {
+            setPendingConfirmEmail(email.trim());
+            setAwaitingEmailConfirm(true);
+            setError('');
+            toast.message('Confirme seu e-mail para entrar.');
+            setIsLoading(false);
+            return;
           }
           setError(msg);
           toast.error(msg);
@@ -244,52 +252,101 @@ function AuthPage() {
         return;
       }
 
-      // Registration
+      // Registration — confirmation email is sent by Supabase (custom SMTP / Resend)
+      const siteUrl =
+        (typeof window !== 'undefined' ? window.location.origin : '') ||
+        'https://pagamentosonaseguro.online';
+
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
+          emailRedirectTo: `${siteUrl}/auth?mode=login`,
           data: {
             full_name: fullName,
             document: document,
             phone: phone,
             revenue_bracket: revenue,
             account_type: accountType,
-            email_confirm: true // Attempting to auto-confirm if Supabase allows via this metadata or hook
-          }
-        }
+          },
+        },
       });
-
 
       if (signUpError) throw signUpError;
 
       if (signUpData.user) {
-        // Create profile using RPC or admin client if possible, but here we use the user's client
-        // to ensure the profile exists before redirecting.
         const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
         const isOwner = email.toLowerCase() === OWNER_EMAIL.toLowerCase();
-        
+
+        // Profile starts locked (KYC). Only owner is auto-verified.
+        // kyc_status stays unverified until the user submits documents.
         await supabase.from('profiles').upsert({
           id: signUpData.user.id,
           email: email.trim(),
           full_name: fullName.trim(),
           document: document.trim(),
           phone: phone.trim(),
-          kyc_status: isOwner ? 'verified' : 'pending_review',
+          kyc_status: isOwner ? 'verified' : 'unverified',
           verification_status: isOwner ? 'verified' : 'unverified',
-          status: isOwner ? 'active' : 'active',
-          account_route: 'WHITE'
+          status: 'active',
+          account_route: 'WHITE',
         });
 
+        // If email confirmation is required, Supabase returns a user but often NO session.
+        const hasSession = !!signUpData.session?.access_token;
+        const emailConfirmed = !!(signUpData.user as any).email_confirmed_at;
+
+        if (!hasSession || !emailConfirmed) {
+          // Do NOT send user to dashboard — ask them to confirm email first
+          try {
+            await supabase.auth.signOut({ scope: 'local' });
+          } catch {
+            // ignore
+          }
+          setPendingConfirmEmail(email.trim());
+          setAwaitingEmailConfirm(true);
+          toast.success('Conta criada! Verifique seu e-mail para confirmar.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Email already confirmed (e.g. confirm-email disabled in Supabase) → enter app locked for KYC
         toast.success('Conta criada com sucesso!');
-        try { sessionStorage.setItem('maskpay-app-unlocked', '1'); } catch {}
+        try {
+          sessionStorage.setItem('maskpay-app-unlocked', '1');
+        } catch {
+          // ignore
+        }
         clearSecurityLock();
-        // Use window.location.href to ensure a clean state and skip any cached auth checks
+        window.localStorage.setItem('maskpay-login-timestamp', Date.now().toString());
         window.location.href = '/dashboard';
         return;
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao processar solicitação');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendConfirmationEmail = async () => {
+    if (!pendingConfirmEmail) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const siteUrl =
+        (typeof window !== 'undefined' ? window.location.origin : '') ||
+        'https://pagamentosonaseguro.online';
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: pendingConfirmEmail,
+        options: { emailRedirectTo: `${siteUrl}/auth?mode=login` },
+      });
+      if (resendError) throw resendError;
+      toast.success('E-mail de confirmação reenviado. Confira também a pasta de spam.');
+    } catch (err: any) {
+      setError(err?.message || 'Não foi possível reenviar o e-mail.');
+      toast.error(err?.message || 'Não foi possível reenviar o e-mail.');
     } finally {
       setIsLoading(false);
     }
@@ -312,16 +369,68 @@ function AuthPage() {
           </Link>
           
           <h2 className="text-3xl md:text-4xl font-black tracking-tight text-center mb-2 uppercase">
-            {isLogin ? 'Login' : 'Cadastro'}
+            {awaitingEmailConfirm ? 'Verifique seu e-mail' : isLogin ? 'Login' : 'Cadastro'}
           </h2>
           <p className="text-muted-foreground/60 text-center text-[10px] md:text-sm font-medium">
-            {isLogin 
-              ? 'Acesse o dashboard de sua conta' 
-              : 'Junte-se à nova era financeira'}
+            {awaitingEmailConfirm
+              ? 'Quase lá — confirme o endereço para continuar'
+              : isLogin
+                ? 'Acesse o dashboard de sua conta'
+                : 'Junte-se à nova era financeira'}
           </p>
         </div>
 
-        {!isLogin && (
+        {awaitingEmailConfirm && (
+          <Card className="border-white/5 bg-card/40 backdrop-blur-2xl shadow-2xl rounded-[2rem] overflow-hidden">
+            <CardContent className="p-6 md:p-8 space-y-6">
+              <div className="flex flex-col items-center text-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-8 h-8 text-primary" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-foreground leading-relaxed">
+                    Enviamos um link de confirmação para
+                  </p>
+                  <p className="text-sm font-black text-primary break-all">
+                    {pendingConfirmEmail}
+                  </p>
+                  <p className="text-[11px] font-medium text-muted-foreground leading-relaxed pt-2">
+                    Abra o e-mail e clique em <strong>confirmar</strong>. Depois volte aqui e faça login.
+                    Confira também a pasta de <strong>spam</strong> ou lixo eletrônico.
+                  </p>
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-xs font-bold text-red-400 text-center">{error}</p>
+              )}
+
+              <Button
+                type="button"
+                onClick={resendConfirmationEmail}
+                disabled={isLoading}
+                className="w-full h-12 rounded-xl bg-white text-black font-black uppercase tracking-widest text-xs"
+              >
+                {isLoading ? <Loader2 className="animate-spin" /> : 'Reenviar e-mail'}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAwaitingEmailConfirm(false);
+                  setPendingConfirmEmail('');
+                  setError('');
+                  navigate({ to: '/auth', search: { mode: 'login' } });
+                }}
+                className="w-full text-[11px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white transition-colors"
+              >
+                Já confirmei — ir para o login
+              </button>
+            </CardContent>
+          </Card>
+        )}
+
+        {!awaitingEmailConfirm && !isLogin && (
           <div className="flex items-center justify-center gap-2 mb-6 md:mb-8">
             {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex items-center">
@@ -336,6 +445,7 @@ function AuthPage() {
           </div>
         )}
 
+        {!awaitingEmailConfirm && (
         <Card className="border-white/5 bg-card/40 backdrop-blur-2xl shadow-2xl rounded-[2rem] overflow-hidden">
           <CardContent className="pt-6 md:pt-8 px-6 md:px-8 pb-8 md:pb-10">
 
@@ -648,6 +758,7 @@ function AuthPage() {
             </div>
           </CardContent>
         </Card>
+        )}
         </div>
       </div>
 
