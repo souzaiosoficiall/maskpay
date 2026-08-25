@@ -37,14 +37,16 @@ export const getAdminFinancialStats = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await ensureAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const hasServiceRole = Boolean(process.env["SUPABASE_SERVICE_ROLE_KEY"]);
+    const db = hasServiceRole ? supabaseAdmin : (context.supabase || supabaseAdmin);
 
     const [depositsRes, walletsRes] = await Promise.all([
-      supabaseAdmin
+      db
         .from('transactions')
         .select('amount')
         .eq('type', 'deposit')
         .in('status', ['completed', 'paid', 'success', 'approved']),
-      supabaseAdmin.from('wallets').select('balance'),
+      db.from('wallets').select('balance'),
     ]);
 
     const totalVolume =

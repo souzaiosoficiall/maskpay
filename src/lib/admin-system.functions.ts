@@ -45,17 +45,19 @@ export const getAllUsers = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await ensureAdmin(context);
 
-    // Fonte principal: tabela profiles (não depende de listUsers / service role).
-    // wallets + KYC em paralelo para reduzir latência.
+    const hasServiceRole = Boolean(process.env["SUPABASE_SERVICE_ROLE_KEY"]);
+    // Com service role: bypass RLS. Sem ela: usa o client do admin logado (precisa de policy RLS).
+    const db = hasServiceRole ? supabaseAdmin : (context.supabase || supabaseAdmin);
+
     const [profilesRes, walletsRes, requestsRes] = await Promise.all([
-      supabaseAdmin
+      db
         .from("profiles")
         .select(
           "id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at",
         )
         .order("created_at", { ascending: false }),
-      supabaseAdmin.from("wallets").select("user_id, balance"),
-      supabaseAdmin
+      db.from("wallets").select("user_id, balance"),
+      db
         .from("verification_requests")
         .select("id, user_id, status, submitted_at, front_path, back_path, selfie_path")
         .order("submitted_at", { ascending: false }),
@@ -65,7 +67,13 @@ export const getAllUsers = createServerFn({ method: "GET" })
       console.error("[getAllUsers] profiles:", profilesRes.error);
       throw new Error(
         profilesRes.error.message ||
-          "Falha ao carregar usuários. Verifique SUPABASE_SERVICE_ROLE_KEY no Vercel.",
+          "Falha ao carregar usuários. Configure SUPABASE_SERVICE_ROLE_KEY na Vercel e faça Redeploy.",
+      );
+    }
+
+    if (!hasServiceRole && (!profilesRes.data || profilesRes.data.length <= 1)) {
+      console.warn(
+        "[getAllUsers] SUPABASE_SERVICE_ROLE_KEY ausente — RLS pode ocultar usuários. Configure a service_role na Vercel.",
       );
     }
 

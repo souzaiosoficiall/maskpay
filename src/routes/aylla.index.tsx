@@ -135,6 +135,10 @@ function AdminPage() {
     }
   }, [isUsersError, usersError]);
 
+  const showEmptyAdminHint =
+    !isLoadingUsers && !isUsersError && Array.isArray(users) && users.length === 0;
+
+
   const hasOpenTickets = useMemo(() =>
     tickets.some((t: any) => t.status === 'Aberto'),
   [tickets]);
@@ -280,7 +284,17 @@ function AdminPage() {
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Visão geral do sistema e moderação.</p>
           </div>
 
-          <AdminDashboardStats 
+          {showEmptyAdminHint && (
+        <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <p className="font-bold">Painel sem dados</p>
+          <p className="mt-1 text-amber-100/80">
+            Configure <code className="text-xs">SUPABASE_SERVICE_ROLE_KEY</code> na Vercel
+            (Project Settings → Environment Variables), depois Redeploy. Sem essa chave o admin
+            não consegue listar todos os usuários por causa do RLS.
+          </p>
+        </div>
+      )}
+      <AdminDashboardStats 
             usersCount={users.length}
             kycPendingCount={kycPendingCount}
             ticketsOpenCount={tickets.filter((t: any) => t.status === 'Aberto').length}
