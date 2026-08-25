@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 const siteUrl = () =>
   process.env["SITE_URL"] ||
   process.env["VITE_SITE_URL"] ||
-  "https://pagamentosonaseguro.online";
+  "https://maskpaygateway.vercel.app";
 
 /**
  * Request a password reset for an email.

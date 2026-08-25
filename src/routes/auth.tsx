@@ -80,11 +80,21 @@ function AuthPage() {
   /** Seconds left before resend confirmation email is allowed (0 = free to resend) */
   const [resendCooldown, setResendCooldown] = useState(0);
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotResendCountdown, setForgotResendCountdown] = useState(0);
 
   useEffect(() => {
     setForgotSent(false);
+    setForgotResendCountdown(0);
     setError('');
   }, [mode]);
+
+  useEffect(() => {
+    if (forgotResendCountdown <= 0) return;
+    const id = window.setInterval(() => {
+      setForgotResendCountdown((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [forgotResendCountdown]);
 
 
   const maskPhone = (value: string) => {
@@ -148,7 +158,13 @@ function AuthPage() {
       }
 
       if (isForgot) {
-        if (forgotSent) {
+        if (forgotSent && forgotResendCountdown > 0) {
+          // Still in cooldown — button acts as "back to login" only when countdown is 0 and label says so
+          setIsLoading(false);
+          return;
+        }
+        if (forgotSent && forgotResendCountdown === 0 && !email.trim()) {
+          // "Voltar ao login" path when user cleared email — navigate
           setForgotSent(false);
           setIsLoading(false);
           navigate({ to: '/auth', search: { mode: 'login' } });
@@ -159,9 +175,35 @@ function AuthPage() {
           setIsLoading(false);
           return;
         }
-        const result = await requestResetServer({ data: { email: email.trim() } });
-        toast.success(result?.message || 'Se o e-mail existir, enviaremos o link de redefinição.');
+
+        // Client-side recovery (same path as signup confirmation e-mail — uses Supabase Auth SMTP)
+        const siteOrigin =
+          (typeof window !== 'undefined' ? window.location.origin : '') ||
+          'https://maskpaygateway.vercel.app';
+        const redirectTo = `${siteOrigin}/auth/reset-password`;
+
+        const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+          email.trim().toLowerCase(),
+          { redirectTo },
+        );
+
+        // Also try server branded e-mail (Resend) in parallel — never blocks UX
+        try {
+          void requestResetServer({ data: { email: email.trim().toLowerCase() } });
+        } catch {
+          // ignore
+        }
+
+        if (resetErr) {
+          console.error('[forgot-password]', resetErr);
+          // Still show success to avoid account enumeration; log for debug
+        }
+
+        toast.success(
+          'Se este e-mail estiver cadastrado, você receberá um link para redefinir a senha. Confira também o spam.',
+        );
         setForgotSent(true);
+        setForgotResendCountdown(60);
         setIsLoading(false);
         return;
       }
@@ -538,17 +580,56 @@ function AuthPage() {
                         Se <strong className="text-white break-all">{email.trim()}</strong> estiver
                         cadastrado, enviamos um link para redefinir a senha. Confira também a pasta de spam.
                       </p>
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                        {forgotResendCountdown > 0
+                          ? `Reenviar em ${forgotResendCountdown}s`
+                          : 'Você já pode reenviar o e-mail'}
+                      </p>
                       <Button
                         type="button"
-                        onClick={() => {
-                          setForgotSent(false);
+                        disabled={forgotResendCountdown > 0 || isLoading}
+                        onClick={async () => {
+                          if (forgotResendCountdown > 0) return;
+                          setIsLoading(true);
                           setError('');
+                          try {
+                            const siteOrigin =
+                              (typeof window !== 'undefined' ? window.location.origin : '') ||
+                              'https://maskpaygateway.vercel.app';
+                            const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+                              email.trim().toLowerCase(),
+                              { redirectTo: `${siteOrigin}/auth/reset-password` },
+                            );
+                            try {
+                              void requestResetServer({ data: { email: email.trim().toLowerCase() } });
+                            } catch {
+                              // ignore
+                            }
+                            if (resetErr) console.error('[forgot-resend]', resetErr);
+                            toast.success('Link reenviado. Confira a caixa de entrada e o spam.');
+                            setForgotResendCountdown(60);
+                          } catch (e: any) {
+                            toast.error(e?.message || 'Falha ao reenviar');
+                          } finally {
+                            setIsLoading(false);
+                          }
                         }}
                         variant="outline"
-                        className="w-full h-12 rounded-xl border-white/10 text-xs font-black uppercase tracking-widest"
+                        className="w-full h-12 rounded-xl border-white/10 text-xs font-black uppercase tracking-widest disabled:opacity-40"
                       >
-                        Enviar novamente
+                        {forgotResendCountdown > 0
+                          ? `Aguarde ${forgotResendCountdown}s`
+                          : isLoading
+                            ? 'Enviando…'
+                            : 'Reenviar e-mail'}
                       </Button>
+                      <button
+                        type="button"
+                        onClick={() => navigate({ to: '/auth', search: { mode: 'login' } })}
+                        className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white"
+                      >
+                        Voltar ao login
+                      </button>
                     </div>
                   ) : (
                     <>
@@ -831,7 +912,7 @@ function AuthPage() {
               )}
 
               <div className="flex gap-3">
-                {!isLogin && step > 1 && (
+                {!isLogin && !isForgot && step > 1 && (
                   <Button 
                     type="button" 
                     variant="outline"
@@ -843,12 +924,13 @@ function AuthPage() {
                     Voltar
                   </Button>
                 )}
+                {!(isForgot && forgotSent) && (
                 <Button 
                   type="submit" 
                   disabled={isLoading || isValidatingCPF || (step === 4 && !acceptTerms) || (step === 3 && !revenue)}
                   className={cn(
                     "bg-white text-black hover:bg-white/90 h-14 rounded-full text-sm font-black transition-all shadow-xl shadow-white/5 flex items-center justify-center gap-2 uppercase tracking-widest",
-                    isLogin || step === 1 ? "w-full" : "flex-1",
+                    isLogin || isForgot || step === 1 ? "w-full" : "flex-1",
                     (isLoading || isValidatingCPF || (step === 4 && !acceptTerms) || (step === 3 && !revenue)) && "opacity-50 cursor-not-allowed"
                   )}
                 >
@@ -856,11 +938,12 @@ function AuthPage() {
                   <Loader2 className="animate-spin h-4 w-4" />
                 ) : (
                   <>
-                    {isForgot ? (forgotSent ? 'Voltar ao login' : 'Enviar link') : isLogin ? 'Entrar' : step === 4 ? 'Finalizar' : 'Continuar'}
-                    <ArrowRight className="w-4 h-4" />
+                    {isForgot ? 'Enviar link' : isLogin ? 'Entrar' : step === 4 ? 'Finalizar' : 'Continuar'}
+                    {!isForgot && <ArrowRight className="w-4 h-4" />}
                   </>
                 )}
                 </Button>
+                )}
               </div>
 
             </form>

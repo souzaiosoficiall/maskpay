@@ -26,7 +26,7 @@ import Lenis from 'lenis';
 import { supabase } from '@/integrations/supabase/client';
 import { isSecurityLocked, clearAuthStorage } from '@/lib/security-lock';
 
-const coinsAsset = { url: "/assets/coins.png" };
+const coinsAsset = { url: "/assets/coins-v2.png" };
 const maskLogoAsset = { url: "/assets/mask_logo.png" };
 const utmifyAsset = { url: "/assets/utmify-logo.png" };
 const googleAsset = { url: "/assets/google-logo.png" };
