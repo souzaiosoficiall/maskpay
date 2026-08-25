@@ -270,11 +270,11 @@ function DashboardPage() {
   );
 
   const promoBanner = (
-    <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_6px_20px_rgba(0,0,0,0.3)] sm:rounded-3xl">
+    <div className="w-full overflow-hidden rounded-2xl border border-white/15 bg-black shadow-[0_8px_28px_rgba(0,0,0,0.45)] sm:rounded-3xl">
       <img
         src="/assets/dashboard-banner.png"
         alt="MaskPay — Gateway feito para você vender mais"
-        className="block h-auto w-full object-contain object-center"
+        className="block h-auto w-full scale-[1.02] object-contain object-center brightness-110 contrast-105"
         width={1400}
         height={290}
         loading="eager"
@@ -431,7 +431,7 @@ function DashboardPage() {
                   <div
                     className={cn(
                       'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
-                      isOut ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400',
+                      isOut ? 'bg-red-500/10 text-red-400' : 'bg-white/10 text-white',
                     )}
                   >
                     {isOut ? (
@@ -450,7 +450,7 @@ function DashboardPage() {
                   <p
                     className={cn(
                       'shrink-0 text-sm font-bold',
-                      isOut ? 'text-red-400' : 'text-emerald-400',
+                      isOut ? 'text-red-400' : 'text-white',
                     )}
                   >
                     {hideValues ? '••••' : `${isOut ? '-' : '+'}${formatted}`}
@@ -489,11 +489,11 @@ function DashboardPage() {
 
   const desktop = (
     <div className="relative z-10 hidden w-full max-w-none font-sans lg:block">
-      {/* soft ambient glow */}
-      <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-white/[0.03] blur-3xl" />
-      <div className="pointer-events-none absolute -right-16 top-40 h-72 w-72 rounded-full bg-emerald-500/[0.04] blur-3xl" />
+      {/* soft ambient glow — platform colors (white/neutral) */}
+      <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-white/[0.04] blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 top-40 h-72 w-72 rounded-full bg-white/[0.03] blur-3xl" />
 
-      <div className="relative space-y-5">
+      <div className="relative space-y-6">
         {/* Title row */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -544,22 +544,31 @@ function DashboardPage() {
 
         {kycBanners}
 
-        {/* Metric cards with sparklines */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-            <p className="text-sm font-medium text-white">Saldo disponível</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Capital livre na carteira</p>
-            <p className="mt-4 text-[1.75rem] font-semibold tracking-tight text-white tabular-nums">
-              {hideValues ? '••••••' : balanceStr}
-            </p>
-            {sparkPath && (
-              <div className="mt-3 flex justify-end">
-                <svg width="120" height="36" className="opacity-90">
-                  <path d={sparkPath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+        {/* Metric cards — saldo no estilo do balão mobile (ícone da plataforma) */}
+        <div className="grid grid-cols-3 gap-5">
+          <div className="theme-hero-card group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white via-white to-white/90 p-5 text-black shadow-[0_20px_50px_-20px_rgba(255,255,255,0.22)]">
+            <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-black/5" />
+            <div className="pointer-events-none absolute -bottom-8 left-1/3 h-20 w-20 rounded-full bg-black/5" />
+            <div className="relative flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-black/45">
+                  Saldo disponível
+                </p>
+                <p className="mt-2 text-[1.75rem] font-black tracking-tight tabular-nums sm:text-3xl">
+                  {hideValues ? '••••••' : balanceStr}
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium text-black/40">
+                  Capital livre na carteira
+                </p>
               </div>
-            )}
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-black/5">
+                <img
+                  src="/assets/mask_logo.png"
+                  alt=""
+                  className="h-6 w-6 object-contain opacity-50"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
@@ -575,12 +584,12 @@ function DashboardPage() {
                   })}
             </p>
             <div className="mt-3 flex items-end justify-between gap-3">
-              <p className="text-xs font-medium text-sky-400/90">
+              <p className="text-xs font-medium text-white/70">
                 {txStats?.totalTransactions || 0} operações
               </p>
               {sparkPath && (
                 <svg width="120" height="36" className="opacity-90">
-                  <path d={sparkPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" />
+                  <path d={sparkPath} fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               )}
             </div>
@@ -599,7 +608,7 @@ function DashboardPage() {
                   })}
             </p>
             <div className="mt-3 flex items-end justify-between gap-3">
-              <p className="text-xs font-medium text-violet-400/90">
+              <p className="text-xs font-medium text-white/70">
                 ticket médio{' '}
                 {hideValues
                   ? '••••'
@@ -610,7 +619,7 @@ function DashboardPage() {
               </p>
               {sparkPath && (
                 <svg width="120" height="36" className="opacity-90">
-                  <path d={sparkPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" />
+                  <path d={sparkPath} fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               )}
             </div>
@@ -620,7 +629,7 @@ function DashboardPage() {
         {/* Chart + side panel */}
         <div className="grid grid-cols-12 gap-4">
           <div className="relative col-span-12 overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-transparent p-5 xl:col-span-8">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
             <div className="mb-4">
               <h2 className="text-base font-semibold text-white">Fluxo de receita</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -638,8 +647,8 @@ function DashboardPage() {
                   <AreaChart data={chartData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="maskpayArea" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#ffffff" stopOpacity={0.28} />
+                        <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.04)" vertical={false} />
@@ -651,7 +660,7 @@ function DashboardPage() {
                     />
                     <YAxis hide />
                     <Tooltip
-                      cursor={{ stroke: 'rgba(52,211,153,0.35)', strokeWidth: 1 }}
+                      cursor={{ stroke: 'rgba(255,255,255,0.25)', strokeWidth: 1 }}
                       contentStyle={{
                         background: '#0c1014',
                         border: '1px solid rgba(255,255,255,0.08)',
@@ -662,11 +671,11 @@ function DashboardPage() {
                     <Area
                       type="monotone"
                       dataKey="value"
-                      stroke="#34d399"
+                      stroke="#e2e8f0"
                       strokeWidth={2.5}
                       fill="url(#maskpayArea)"
                       dot={false}
-                      activeDot={{ r: 5, fill: '#34d399', stroke: '#0c1014', strokeWidth: 2 }}
+                      activeDot={{ r: 5, fill: '#ffffff', stroke: '#0c1014', strokeWidth: 2 }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -675,7 +684,7 @@ function DashboardPage() {
             <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 AVG{' '}
-                <span className="font-semibold text-emerald-400">
+                <span className="font-semibold text-white">
                   {hideValues
                     ? '••••'
                     : (txStats?.averageTicket || 0).toLocaleString('pt-BR', {
@@ -696,7 +705,7 @@ function DashboardPage() {
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/20 px-3 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-xs font-bold text-emerald-400">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-xs font-bold text-white">
                       PIX
                     </span>
                     <div>
@@ -782,7 +791,7 @@ function DashboardPage() {
                         <td
                           className={cn(
                             'px-4 py-3 text-right font-semibold tabular-nums',
-                            isOut ? 'text-red-400' : 'text-emerald-400',
+                            isOut ? 'text-red-400' : 'text-white',
                           )}
                         >
                           {hideValues ? '••••' : `${isOut ? '-' : '+'}${formatted}`}

@@ -21,8 +21,7 @@ import {
   resetUserPassword,
   getAdminLogs,
   deleteUser
-, getAdminDiagnostics } from '@/lib/admin-system.functions';
-// diagnostics
+} from '@/lib/admin-system.functions';
 import { getAdminFinancialStats } from '@/lib/admin-financial.functions';
 import { useServerFn } from '@tanstack/react-start';
 import { useSessionReady } from '@/hooks/useSessionReady';
@@ -81,7 +80,6 @@ function AdminPage() {
   const sessionReady = useSessionReady();
   
   const fetchUsers = useServerFn(getAllUsers);
-  const fetchDiagnostics = useServerFn(getAdminDiagnostics);
   const fetchTickets = useServerFn(getTickets);
   const fetchMessages = useServerFn(getTicketMessages);
   const doSendMessage = useServerFn(sendTicketMessage);
@@ -101,14 +99,6 @@ function AdminPage() {
     retry: 1,
     enabled: sessionReady,
     staleTime: 20_000,
-    refetchOnMount: true,
-  });
-
-  const { data: adminDiag } = useQuery({
-    queryKey: ['admin_diagnostics'],
-    queryFn: () => fetchDiagnostics({}),
-    enabled: sessionReady,
-    staleTime: 10_000,
     refetchOnMount: true,
   });
 
@@ -144,10 +134,6 @@ function AdminPage() {
       );
     }
   }, [isUsersError, usersError]);
-
-  const showEmptyAdminHint =
-    !isLoadingUsers && !isUsersError && Array.isArray(users) && users.length === 0;
-
 
   const hasOpenTickets = useMemo(() =>
     tickets.some((t: any) => t.status === 'Aberto'),
@@ -294,26 +280,7 @@ function AdminPage() {
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Visão geral do sistema e moderação.</p>
           </div>
 
-          {(showEmptyAdminHint || adminDiag) && (
-        <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100 space-y-2">
-          <p className="font-bold">Diagnóstico do painel</p>
-          {adminDiag ? (
-            <ul className="text-xs text-amber-100/85 space-y-1 font-mono">
-              <li>SUPABASE_URL: {adminDiag.hasSupabaseUrl ? `ok (${adminDiag.supabaseHost})` : "AUSENTE"}</li>
-              <li>SERVICE_ROLE: {adminDiag.hasServiceRoleKey ? "presente no runtime" : "AUSENTE no runtime — Redeploy"}</li>
-              <li>Profiles no banco: {adminDiag.profilesCount === null ? "—" : adminDiag.profilesCount}</li>
-              {adminDiag.profilesError && <li className="text-red-300">Erro: {adminDiag.profilesError}</li>}
-              <li className="font-sans text-amber-50">{adminDiag.hint}</li>
-            </ul>
-          ) : (
-            <p className="text-amber-100/80 text-xs">Carregando diagnóstico…</p>
-          )}
-          <p className="text-xs text-amber-100/70">
-            Após criar/editar variáveis na Vercel, use Deployments → Redeploy. Trocar só o domínio no Supabase não preenche o admin.
-          </p>
-        </div>
-      )}
-      <AdminDashboardStats 
+          <AdminDashboardStats 
             usersCount={users.length}
             kycPendingCount={kycPendingCount}
             ticketsOpenCount={tickets.filter((t: any) => t.status === 'Aberto').length}

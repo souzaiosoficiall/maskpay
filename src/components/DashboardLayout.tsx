@@ -301,11 +301,11 @@ export default function DashboardLayout() {
         </header>
 
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-5 lg:px-3 lg:pt-4"
+          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6 lg:px-4 lg:pt-5"
         >
           <PwaPrompt />
           <PushNotificationManager />
-          <div className="mx-auto w-full max-w-7xl p-4 md:p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-7xl p-4 md:p-6 lg:max-w-none lg:px-6 lg:py-6 xl:px-8">
             {!path.startsWith('/verify') && <NotificationManager />}
             <Outlet />
           </div>
