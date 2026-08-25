@@ -223,10 +223,7 @@ export default function DashboardLayout() {
         </header>
 
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar"
-          style={{
-            paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))',
-          }}
+          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6"
         >
           <PwaPrompt />
           <PushNotificationManager />
