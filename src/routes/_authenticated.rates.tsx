@@ -31,20 +31,25 @@ function RatesPage() {
   const depositFixed = fees?.deposit?.fixed ?? (routeLabel === 'BLACK' ? 1 : 0.4);
   const withdrawFixed = fees?.withdrawal?.fixed ?? (routeLabel === 'BLACK' ? 1 : 0.8);
 
+  const fmtMoney = (n: number) =>
+    `R$ ${Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   const rates = [
     { 
       title: 'Recebimento PIX', 
       rate: `${Number(depositPct).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`, 
-      fixed: `R$ ${Number(depositFixed).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
+      fixed: fmtMoney(depositFixed), 
       icon: Wallet, 
-      description: 'Taxa descontada do valor recebido' 
+      description: 'Taxa descontada do valor recebido',
+      isFixedOnly: false,
     },
     { 
       title: 'Saque PIX', 
-      rate: 'Taxa fixa', 
-      fixed: `R$ ${Number(withdrawFixed).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
+      rate: fmtMoney(withdrawFixed), 
+      fixed: 'Taxa fixa', 
       icon: Wallet, 
-      description: 'Descontada do valor enviado ao destinatário' 
+      description: 'Descontada do valor enviado ao destinatário',
+      isFixedOnly: true,
     },
   ];
 
@@ -76,7 +81,7 @@ function RatesPage() {
               <div className="flex flex-col gap-1">
                 <div className="text-3xl font-black tracking-tighter">{item.rate}</div>
                 <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                  {item.title === 'Saque PIX' ? 'Por transação' : `+ ${item.fixed} por transação`}
+                  {item.isFixedOnly ? 'Por transação (taxa fixa)' : `+ ${item.fixed} por transação`}
                 </div>
               </div>
               <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-tight leading-relaxed">
