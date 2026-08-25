@@ -64,7 +64,7 @@ function CheckoutPagesPage() {
     enabled: sessionReady,
   });
 
-  const { data: products = [] } = useQuery({
+  const { data: products = [], isLoading: isLoadingProducts, isFetched: productsFetched } = useQuery({
     queryKey: ['catalog_products'],
     queryFn: () => fetchProducts({}),
     enabled: sessionReady,
@@ -109,6 +109,10 @@ function CheckoutPagesPage() {
   });
 
   const openCreate = () => {
+    if (isLoadingProducts || !productsFetched) {
+      toast.message('Carregando produtos...');
+      return;
+    }
     if (!products.length) {
       toast.error('Cadastre um produto antes de criar o checkout.');
       return;
@@ -138,9 +142,12 @@ function CheckoutPagesPage() {
         </Button>
       </div>
 
-      {!products.length && (
+      {productsFetched && !isLoadingProducts && !products.length && (
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm">
           <p className="font-bold text-amber-200">Cadastre produtos primeiro</p>
+          <p className="mt-1 text-xs text-amber-200/70">
+            Crie pelo menos um item em Produtos para vincular ao checkout.
+          </p>
           <Link to="/products" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-primary">
             <Package className="h-3.5 w-3.5" /> Ir para Produtos
           </Link>
