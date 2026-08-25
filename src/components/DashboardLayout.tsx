@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link, useNavigate, useLocation } from '@tanstack/react-router';
+import { Outlet, Link, useNavigate, useLocation } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { getProfile, type ProfileWithRole } from '@/lib/settings.functions';
@@ -7,329 +7,403 @@ import { PwaPrompt } from './PwaPrompt';
 import { PushNotificationManager } from './PushNotificationManager';
 import { useSessionReady } from '@/hooks/useSessionReady';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  ArrowLeftRight, 
-  Webhook, 
-  Settings, 
+import {
+  LayoutDashboard,
+  ArrowLeftRight,
+  Webhook,
+  Settings,
   LogOut,
-  Menu,
   FileCode2,
   BookOpen,
   Receipt,
   MessageSquare,
   Lock,
   X,
-  Fingerprint,
-  ChevronDown
+  ChevronDown,
+  QrCode,
+  Home,
+  Wallet,
+  MoreHorizontal,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import maskPlatformAsset from "@/lib/mask-asset";
-import { supabase } from "@/integrations/supabase/client";
+import maskPlatformAsset from '@/lib/mask-asset';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function DashboardLayout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isTransferMenuOpen, setIsTransferMenuOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+
   const navigate = useNavigate();
   const location = useLocation();
   const sessionReady = useSessionReady();
   const fetchProfile = useServerFn(getProfile);
 
-  const { data: profile, isLoading: isProfileLoading } = useQuery({
+  const { data: profile } = useQuery({
     queryKey: ['profile'],
     queryFn: () => fetchProfile({}),
     enabled: sessionReady,
     staleTime: 5000,
-  }) as { data: ProfileWithRole | undefined; isLoading: boolean };
+  }) as { data: ProfileWithRole | undefined };
 
-  // Wait for profile — don't lock (or flash) while loading for verified accounts
-  const isKycLocked = !!profile && profile.role !== 'admin' && profile.verification_status !== 'verified';
+  const isKycLocked =
+    !!profile && profile.role !== 'admin' && profile.verification_status !== 'verified';
+  const canAccess = !isKycLocked || profile?.role === 'admin';
 
   useEffect(() => {
-    setIsMobileMenuOpen(false);
+    setIsMoreOpen(false);
   }, [location.pathname]);
 
-  // Lock body scroll while mobile drawer is open (prevents background scroll on iOS)
   useEffect(() => {
-    if (!isMobileMenuOpen) return;
+    if (!isMoreOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [isMobileMenuOpen]);
+  }, [isMoreOpen]);
 
-  const menuItems = [
-    { icon: Webhook, label: 'Movimentações', to: '/transactions' },
-    { icon: Receipt, label: 'Taxas', to: '/rates' },
-    { icon: FileCode2, label: 'API', to: '/api-keys' },
-    { icon: BookOpen, label: 'Documentação', to: '/docs' },
+  const logout = async () => {
+    try {
+      window.localStorage.removeItem('maskpay-login-timestamp');
+      try {
+        sessionStorage.removeItem('maskpay-app-unlocked');
+      } catch {}
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {}
+    window.location.href = '/auth?mode=login';
+  };
+
+  const path = location.pathname;
+  const isActive = (to: string) => path === to || path.startsWith(to + '/');
+
+  const go = (to: string, locked = false) => {
+    if (locked && !canAccess) return;
+    navigate({ to: to as any });
+  };
+
+  const moreItems = [
+    { label: 'Depositar', to: '/deposit', icon: ArrowDownToLine, lock: true },
+    { label: 'Sacar', to: '/withdraw', icon: ArrowUpFromLine, lock: true },
+    { label: 'Transferir', to: '/transfer', icon: ArrowLeftRight, lock: true },
+    { label: 'Taxas', to: '/rates', icon: Receipt, lock: true },
+    { label: 'API', to: '/api-keys', icon: FileCode2, lock: true },
+    { label: 'Documentação', to: '/docs', icon: BookOpen, lock: false },
+    { label: 'Suporte', to: '/support', icon: MessageSquare, lock: false },
+    { label: 'Ajustes', to: '/settings', icon: Settings, lock: true },
   ];
 
-  const SidebarContent = ({ isMobile = false }) => (
-    <div className="flex flex-col h-full bg-card">
-      <div className="flex items-center px-6 border-b border-white/5 shrink-0 h-14 md:h-16">
-        <Link to="/" className="flex items-center gap-3 overflow-hidden">
-          <img src={maskPlatformAsset.url} alt="MaskPay" className={cn("object-contain transition-all", (isSidebarOpen || isMobile) ? "w-8 h-8 min-w-8" : "w-6 h-6 min-w-6")} />
-          {(isSidebarOpen || isMobile) && (
-            <span className="text-xl font-black tracking-tighter uppercase whitespace-nowrap flex items-center gap-2">
-              MaskPay |
-            </span>
-          )}
-        </Link>
+  /** Desktop sidebar (kept for large screens) */
+  const DesktopNav = () => (
+    <aside className="hidden lg:flex w-64 flex-col border-r border-white/5 bg-card shrink-0">
+      <div className="flex h-16 items-center gap-3 border-b border-white/5 px-6">
+        <img src={maskPlatformAsset.url} alt="" className="h-8 w-8 object-contain" />
+        <span className="text-lg font-black uppercase tracking-tighter">MaskPay</span>
       </div>
-
-      <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
-        <div className={cn("px-3 text-[10px] font-black text-muted-foreground/20 uppercase tracking-[0.2em] mb-3 mt-2", (!isSidebarOpen && !isMobile) && "text-center")}>
-          {(isSidebarOpen || isMobile) ? "Gerenciamento" : "•••"}
-        </div>
-        
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3 custom-scrollbar">
         <Link
           to="/dashboard"
-          activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
-          inactiveProps={{ className: "bg-background border-transparent" }}
-          className="flex items-center gap-3 px-4 py-3 rounded-2xl text-muted-foreground hover:bg-white/5 hover:text-white transition-all group mb-1 border border-transparent bg-background"
+          className={cn(
+            'flex items-center gap-3 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest transition-all',
+            isActive('/dashboard')
+              ? 'border border-white/10 bg-white/5 text-white'
+              : 'text-muted-foreground hover:bg-white/5 hover:text-white',
+          )}
         >
-          <LayoutDashboard className="h-5 w-5 min-w-5 group-hover:scale-110 transition-transform" />
-          {(isSidebarOpen || isMobile) && <span className="text-xs font-black uppercase tracking-widest">Página Inicial</span>}
+          <LayoutDashboard className="h-5 w-5" />
+          Início
         </Link>
 
-        <div className="space-y-1">
-          <button
-            onClick={() => !isKycLocked && setIsTransferMenuOpen(!isTransferMenuOpen)}
-            disabled={isKycLocked && profile?.role !== 'admin'}
+        <button
+          type="button"
+          onClick={() => canAccess && setIsTransferMenuOpen(!isTransferMenuOpen)}
+          className={cn(
+            'flex w-full items-center justify-between rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest text-muted-foreground transition-all hover:bg-white/5 hover:text-white',
+            !canAccess && 'opacity-50',
+          )}
+        >
+          <span className="flex items-center gap-3">
+            <ArrowLeftRight className="h-5 w-5" />
+            Transferências
+          </span>
+          <ChevronDown
+            className={cn('h-4 w-4 transition-transform', isTransferMenuOpen && 'rotate-180')}
+          />
+        </button>
+        {isTransferMenuOpen && (
+          <div className="mb-2 space-y-1 pl-4">
+            {[
+              { label: 'Saque', to: '/withdraw' },
+              { label: 'Pagar QRcode', to: '/pay-qr' },
+              { label: 'Depositar', to: '/deposit' },
+              { label: 'Transferência', to: '/transfer' },
+            ].map((item) => (
+              <Link
+                key={item.to}
+                to={item.to as any}
+                className={cn(
+                  'block rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 hover:text-white',
+                  !canAccess && 'pointer-events-none opacity-50',
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {[
+          { label: 'Movimentações', to: '/transactions', icon: Webhook },
+          { label: 'Taxas', to: '/rates', icon: Receipt },
+          { label: 'API', to: '/api-keys', icon: FileCode2 },
+          { label: 'Documentação', to: '/docs', icon: BookOpen },
+          { label: 'Suporte', to: '/support', icon: MessageSquare },
+          { label: 'Ajustes', to: '/settings', icon: Settings },
+        ].map((item) => (
+          <Link
+            key={item.to}
+            to={item.to as any}
             className={cn(
-              "w-full flex items-center justify-between px-4 py-3 rounded-2xl text-muted-foreground hover:bg-white/5 hover:text-white transition-all group mb-1 border border-transparent bg-background cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
-              isTransferMenuOpen && "text-white"
+              'flex items-center gap-3 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest transition-all',
+              isActive(item.to)
+                ? 'border border-white/10 bg-white/5 text-white'
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white',
+              item.to !== '/docs' && item.to !== '/support' && !canAccess && 'pointer-events-none opacity-50',
             )}
           >
-            <div className="flex items-center gap-3">
-              <ArrowLeftRight className="h-5 w-5 min-w-5 group-hover:scale-110 transition-transform" />
-              {(isSidebarOpen || isMobile) && <span className="text-xs font-black uppercase tracking-widest">Transferências</span>}
-            </div>
-            {(isSidebarOpen || isMobile) && (
-              <div className="flex items-center gap-2">
-                {isKycLocked && profile?.role !== 'admin' && <Lock className="h-3 w-3 text-muted-foreground/40" />}
-                <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isTransferMenuOpen && "rotate-180")} />
-              </div>
+            <item.icon className="h-5 w-5" />
+            {item.label}
+            {!canAccess && item.to !== '/docs' && item.to !== '/support' && (
+              <Lock className="ml-auto h-3 w-3 opacity-40" />
             )}
-          </button>
-          
-          <div className={cn(
-            "overflow-hidden transition-all duration-300 ease-in-out pl-4",
-            isTransferMenuOpen ? "max-h-56 opacity-100 mb-2" : "max-h-0 opacity-0"
-          )}>
-            {['Saque', 'Pagar QRcode', 'Depositar', 'Transferência'].map((label, idx) => {
-              const to =
-                idx === 0 ? '/withdraw' :
-                idx === 1 ? '/pay-qr' :
-                idx === 2 ? '/deposit' : '/transfer';
-              const isLocked = isKycLocked; // Everything in transfers is locked if KYC is not verified
-              return (
-                <Link
-                  key={label}
-                  to={to}
-                  disabled={!!isLocked && profile?.role !== 'admin'}
-                  activeProps={{ className: "text-white bg-white/5 border border-white/10" }}
-                  inactiveProps={{ className: "text-muted-foreground/60 border-transparent" }}
-                  className={cn(
-                    "flex items-center justify-between px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all rounded-xl border mb-1",
-                    isLocked && profile?.role !== 'admin' && "opacity-50 cursor-not-allowed pointer-events-none"
-                  )}
-                >
-                  <span>{label}</span>
-                  {isLocked && profile?.role !== 'admin' && <Lock className="h-3 w-3 text-muted-foreground/40" />}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
-        {menuItems.map((item) => {
-          const isLocked = isKycLocked && profile?.role !== 'admin';
-          return (
-            <Link
-              key={item.label}
-              to={item.to as any}
-              disabled={!!isLocked}
-              activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
-              inactiveProps={{ className: "bg-background border-transparent" }}
-              className={cn(
-                "flex items-center justify-between px-4 py-3 rounded-2xl text-muted-foreground hover:bg-white/5 hover:text-white transition-all group mb-1 border",
-                isLocked && "opacity-50 cursor-not-allowed pointer-events-none"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <item.icon className="h-5 w-5 min-w-5 group-hover:scale-110 transition-transform" />
-                {(isSidebarOpen || isMobile) && <span className="text-xs font-black uppercase tracking-widest">{item.label}</span>}
-              </div>
-              {(isSidebarOpen || isMobile) && isLocked && <Lock className="h-3 w-3 text-muted-foreground/40" />}
-            </Link>
-          );
-        })}
-        
-        <div className="pt-8 pb-3">
-          <div className={cn("px-3 text-[10px] font-black text-muted-foreground/20 uppercase tracking-[0.2em]", (!isSidebarOpen && !isMobile) && "text-center")}>
-            {(isSidebarOpen || isMobile) ? "Configuração" : "•••"}
-          </div>
-        </div>
-
-        <Link
-          to="/support"
-          activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
-          inactiveProps={{ className: "bg-background border-transparent" }}
-          className="flex items-center gap-3 px-4 py-3 rounded-2xl text-muted-foreground hover:bg-white/5 hover:text-white transition-all group mb-1 border border-transparent bg-background"
-        >
-          <MessageSquare className="h-5 w-5 min-w-5" />
-          {(isSidebarOpen || isMobile) && <span className="text-xs font-black uppercase tracking-widest">Suporte</span>}
-        </Link>
-
-        <Link
-          to="/settings"
-          disabled={!!isKycLocked && profile?.role !== 'admin'}
-          activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
-          inactiveProps={{ className: "bg-background border-transparent" }}
-          className={cn(
-            "flex items-center justify-between px-4 py-3 rounded-2xl text-muted-foreground hover:bg-white/5 hover:text-white transition-all group mb-1 border",
-            isKycLocked && profile?.role !== 'admin' && "opacity-50 cursor-not-allowed pointer-events-none"
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <Settings className="h-5 w-5 min-w-5" />
-            {(isSidebarOpen || isMobile) && <span className="text-xs font-black uppercase tracking-widest">Ajustes</span>}
-          </div>
-          {(isSidebarOpen || isMobile) && isKycLocked && profile?.role !== 'admin' && <Lock className="h-3 w-3 text-muted-foreground/40" />}
-        </Link>
+          </Link>
+        ))}
       </nav>
-
-      <div className="p-4 border-t border-white/5 pb-[env(safe-area-inset-bottom)]">
-        <Button 
-          variant="ghost" 
-          className={cn(
-            "w-full justify-start text-destructive/50 hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 transition-all group rounded-2xl", 
-            (!isSidebarOpen && !isMobile) && "px-0 justify-center"
-          )}
-          onClick={async () => {
-            try {
-              window.localStorage.removeItem('maskpay-login-timestamp');
-              try { sessionStorage.removeItem('maskpay-app-unlocked'); } catch {}
-              await supabase.auth.signOut({ scope: 'local' });
-            } catch {}
-            window.location.href = '/auth?mode=login';
-          }}
+      <div className="border-t border-white/5 p-4">
+        <Button
+          variant="ghost"
+          className="w-full justify-start rounded-2xl text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+          onClick={logout}
         >
-          <LogOut className="h-5 w-5 min-w-5" />
-          {(isSidebarOpen || isMobile) && <span className="ml-3 text-xs font-black uppercase tracking-widest">Sair</span>}
+          <LogOut className="mr-3 h-5 w-5" />
+          <span className="text-xs font-black uppercase tracking-widest">Sair</span>
         </Button>
       </div>
-    </div>
+    </aside>
   );
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden text-foreground selection:bg-white/10">
-      {/* Desktop Sidebar */}
-      <aside 
-        className={cn(
-          "bg-card border-r border-white/5 flex flex-col transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] z-50 hidden lg:flex",
-          isSidebarOpen ? "w-64" : "w-20"
-        )}
-      >
-        <SidebarContent />
-      </aside>
+    <div className="flex h-[100dvh] overflow-hidden bg-background text-foreground selection:bg-white/10">
+      <DesktopNav />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 h-full relative">
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        {/* Compact top bar (mobile) */}
         <header
-          className="bg-background border-b border-white/5 flex items-center px-4 md:px-6 sticky top-0 z-40 shrink-0 relative"
+          className="flex shrink-0 items-center justify-between border-b border-white/5 bg-background/95 px-4 backdrop-blur-md lg:hidden"
           style={{
-            paddingTop: "env(safe-area-inset-top, 0px)",
-            height: "calc(3.5rem + env(safe-area-inset-top, 0px))",
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+            height: 'calc(3.25rem + env(safe-area-inset-top, 0px))',
           }}
         >
-          {/* Esquerda: menu */}
-          <div className="flex items-center z-10">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="hidden lg:flex text-muted-foreground/60 hover:text-white rounded-xl"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden text-muted-foreground/60 hover:text-white rounded-xl"
-              onClick={() => setIsMobileMenuOpen(true)}
-              aria-label="Abrir menu"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
+          <div className="flex items-center gap-2.5">
+            <img src={maskPlatformAsset.url} alt="" className="h-7 w-7 object-contain" />
+            <span className="text-sm font-black uppercase tracking-[0.12em]">MaskPay</span>
           </div>
-
-          {/* Centro: ícone + MaskPay (sem "|") */}
-          <div
-            className="absolute inset-x-0 flex items-center justify-center pointer-events-none gap-3"
-            style={{ top: "env(safe-area-inset-top, 0px)", bottom: 0 }}
+          <button
+            type="button"
+            onClick={logout}
+            className="rounded-full p-2 text-muted-foreground/50 hover:bg-white/5 hover:text-white"
+            aria-label="Sair"
           >
-            <img
-              src={maskPlatformAsset.url}
-              alt=""
-              className="w-7 h-7 md:w-8 md:h-8 object-contain"
-            />
-            <span className="text-sm md:text-base font-black tracking-[0.2em] uppercase text-foreground">
-              MaskPay
-            </span>
-          </div>
-
-          <div className="ml-auto w-9 h-9" aria-hidden />
+            <LogOut className="h-4 w-4" />
+          </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-background custom-scrollbar">
+        <main
+          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar"
+          style={{
+            paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))',
+          }}
+        >
           <PwaPrompt />
           <PushNotificationManager />
-          <div className="max-w-7xl mx-auto p-4 md:p-8 w-full">
-            {/* Don't interrupt KYC / document upload with admin banners */}
-            {!location.pathname.startsWith('/verify') && <NotificationManager />}
+          <div className="mx-auto w-full max-w-7xl p-4 md:p-6 lg:p-8">
+            {!path.startsWith('/verify') && <NotificationManager />}
             <Outlet />
           </div>
         </main>
-      </div>
 
-      {/* Menu mobile — Framer Motion (abertura/fechamento suaves) */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.button
-              key="maskpay-drawer-overlay"
-              type="button"
-              aria-label="Fechar menu"
-              className="fixed inset-0 z-[60] bg-black/70 lg:hidden"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              onClick={() => setIsMobileMenuOpen(false)}
+        {/* Bottom navigation — mobile / tablet */}
+        <nav
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl lg:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <div className="relative mx-auto flex h-[4.25rem] max-w-lg items-end justify-between px-2 pb-1.5">
+            <BottomItem
+              label="Início"
+              active={isActive('/dashboard')}
+              onClick={() => go('/dashboard')}
+              icon={<Home className="h-5 w-5" />}
             />
-            <motion.aside
-              key="maskpay-drawer-panel"
-              className="fixed inset-y-0 left-0 z-[70] w-72 max-w-[85vw] bg-background border-r border-white/5 flex flex-col lg:hidden shadow-2xl"
-              style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <SidebarContent isMobile />
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+            <BottomItem
+              label="Extrato"
+              active={isActive('/transactions')}
+              onClick={() => go('/transactions', true)}
+              locked={!canAccess}
+              icon={<Webhook className="h-5 w-5" />}
+            />
+
+            {/* Center QR — elevated like the reference app */}
+            <div className="relative -top-5 flex w-[4.5rem] flex-col items-center">
+              <button
+                type="button"
+                onClick={() => go('/pay-qr', true)}
+                disabled={!canAccess}
+                className={cn(
+                  'flex h-14 w-14 items-center justify-center rounded-full border-4 border-background bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,0.15)] transition-transform active:scale-95',
+                  !canAccess && 'opacity-40',
+                )}
+                aria-label="Pagar com QR Code"
+              >
+                <QrCode className="h-6 w-6" strokeWidth={2.25} />
+              </button>
+              <span className="mt-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                QR Code
+              </span>
+            </div>
+
+            <BottomItem
+              label="Carteira"
+              active={isActive('/deposit') || isActive('/withdraw') || isActive('/wallet')}
+              onClick={() => go('/deposit', true)}
+              locked={!canAccess}
+              icon={<Wallet className="h-5 w-5" />}
+            />
+            <BottomItem
+              label="Mais"
+              active={isMoreOpen || isActive('/settings')}
+              onClick={() => setIsMoreOpen(true)}
+              icon={<MoreHorizontal className="h-5 w-5" />}
+            />
+          </div>
+        </nav>
+
+        {/* "Mais" bottom sheet */}
+        <AnimatePresence>
+          {isMoreOpen && (
+            <>
+              <motion.button
+                type="button"
+                aria-label="Fechar"
+                className="fixed inset-0 z-[60] bg-black/70 lg:hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMoreOpen(false)}
+              />
+              <motion.div
+                className="fixed inset-x-0 bottom-0 z-[70] rounded-t-3xl border border-white/10 bg-[#0c0c0c] lg:hidden"
+                style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              >
+                <div className="flex justify-center pt-3">
+                  <div className="h-1 w-10 rounded-full bg-white/20" />
+                </div>
+                <div className="flex items-center justify-between px-5 pb-2 pt-3">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white">Menu</h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsMoreOpen(false)}
+                    className="rounded-full p-2 text-muted-foreground hover:bg-white/5 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-2 px-4 pb-4">
+                  {moreItems.map((item) => {
+                    const locked = item.lock && !canAccess;
+                    return (
+                      <button
+                        key={item.to}
+                        type="button"
+                        disabled={locked}
+                        onClick={() => {
+                          if (locked) return;
+                          setIsMoreOpen(false);
+                          navigate({ to: item.to as any });
+                        }}
+                        className={cn(
+                          'flex flex-col items-center gap-2 rounded-2xl border border-white/5 bg-white/[0.03] px-2 py-3 transition-colors hover:bg-white/[0.06]',
+                          locked && 'opacity-40',
+                        )}
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5">
+                          <item.icon className="h-4 w-4 text-white" />
+                        </div>
+                        <span className="text-center text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                          {item.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="border-t border-white/5 px-4 py-3">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-center rounded-2xl text-destructive/70 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={logout}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Sair da conta</span>
+                  </Button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
+  );
+}
+
+function BottomItem({
+  label,
+  icon,
+  active,
+  onClick,
+  locked,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+  onClick: () => void;
+  locked?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex w-[4.25rem] flex-col items-center gap-1 py-1 transition-colors',
+        active ? 'text-white' : 'text-muted-foreground/50',
+        locked && 'opacity-40',
+      )}
+    >
+      <span
+        className={cn(
+          'flex h-9 w-9 items-center justify-center rounded-2xl transition-colors',
+          active && 'bg-white/10',
+        )}
+      >
+        {icon}
+      </span>
+      <span className="text-[9px] font-bold uppercase tracking-wider">{label}</span>
+    </button>
   );
 }
