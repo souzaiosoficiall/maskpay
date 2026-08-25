@@ -364,7 +364,9 @@ function PayQrPage() {
     return parsed?.amount ?? 0;
   })();
 
-  const totalDebit = Math.round((payAmount + feeFixed) * 100) / 100;
+  // Taxa desconta do valor do QR: sai da conta o valor do PIX; destinatário recebe valor - taxa
+  const totalDebit = Math.round(payAmount * 100) / 100;
+  const recipientGets = Math.max(0, Math.round((payAmount - feeFixed) * 100) / 100);
   const balance = Number(wallet?.balance || 0);
   const effectiveKey = (manualKey || parsed?.pixKey || '').trim();
 
@@ -652,19 +654,19 @@ function PayQrPage() {
 
             <div className="rounded-2xl border border-white/10 bg-black/50 p-4 space-y-3">
               <div className="flex justify-between text-[11px] font-black uppercase tracking-widest">
-                <span className="text-muted-foreground">Destinatário recebe</span>
-                <span className="text-green-400">{formatBRL(payAmount)}</span>
+                <span className="text-muted-foreground">Valor do PIX</span>
+                <span className="text-white">{formatBRL(payAmount)}</span>
               </div>
               <div className="flex justify-between text-[11px] font-black uppercase tracking-widest">
-                <span className="text-muted-foreground">Taxa MaskPay (do seu saldo)</span>
+                <span className="text-muted-foreground">Taxa MaskPay (descontada)</span>
                 <span className="text-red-400">− {formatBRL(feeFixed)}</span>
               </div>
               <div className="flex justify-between items-center pt-3 border-t border-white/10">
-                <span className="text-[11px] font-black uppercase tracking-widest">Debitado da sua conta</span>
-                <span className="text-xl font-black text-white">{formatBRL(totalDebit)}</span>
+                <span className="text-[11px] font-black uppercase tracking-widest">Destinatário recebe</span>
+                <span className="text-xl font-black text-green-400">{formatBRL(recipientGets)}</span>
               </div>
               <p className="text-[9px] font-bold text-muted-foreground/70 leading-relaxed">
-                A taxa é cobrada da sua conta. Quem recebe fica com o valor integral do PIX.
+                A taxa é descontada do valor. Sai da sua conta o valor do PIX; quem recebe fica com valor menos a taxa.
               </p>
               <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 <Wallet className="w-3.5 h-3.5" />

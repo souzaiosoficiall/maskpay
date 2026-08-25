@@ -116,12 +116,31 @@ export function DevToolsDetector() {
       }
     };
 
+    
+    const handleDragStart = (e: DragEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'IMG' || target.closest?.('img'))) {
+        e.preventDefault();
+      }
+    };
+
+    const handleSelectStart = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'IMG' || target.closest?.('img'))) {
+        e.preventDefault();
+      }
+    };
+
     window.addEventListener('contextmenu', handleContextMenu, true);
     window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('dragstart', handleDragStart, true);
+    window.addEventListener('selectstart', handleSelectStart, true);
 
     return () => {
       window.removeEventListener('contextmenu', handleContextMenu, true);
       window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('dragstart', handleDragStart, true);
+      window.removeEventListener('selectstart', handleSelectStart, true);
       window.removeEventListener('pageshow', onPageShow);
     };
   }, []);

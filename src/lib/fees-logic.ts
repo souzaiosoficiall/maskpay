@@ -1,13 +1,14 @@
 /**
- * Centralized fee calculation logic to ensure consistency across the platform.
+ * Taxas da plataforma — SEMPRE descontam do valor (nunca somam por cima).
  *
- * Deposit: platform TAKES fee from the incoming amount (user receives net).
- *   fee = amount * 2.49% + R$ 0,40
- *   credit to wallet = amount - fee
+ * Depósito:
+ *   taxa = amount * % + fixo
+ *   crédito na carteira = amount - taxa
  *
- * Withdrawal / Pay QR: platform TAKES fixed fee from the user's balance.
- *   Recipient receives the FULL requested amount.
- *   User is debited amount + R$ 0,80.
+ * Saque / Pagar QR:
+ *   taxa = fixo
+ *   debitado da carteira = amount (valor informado)
+ *   destinatário recebe = amount - taxa
  */
 
 export interface PlatformFees {
@@ -20,10 +21,8 @@ export interface PlatformFees {
   };
 }
 
-/**
- * Deposit: fee is subtracted from the paid amount. User receives net.
- */
-export function calculateDepositAmounts(amount: number, fees: PlatformFees['deposit']) {
+/** Depósito: taxa descontada do valor pago. */
+export function calculateDepositAmounts(amount: number, fees: PlatformFees["deposit"]) {
   const percentageFee = (amount * fees.percentage) / 100;
   const totalFee = Math.round((percentageFee + fees.fixed) * 100) / 100;
   const netAmount = Math.round((amount - totalFee) * 100) / 100;
@@ -35,21 +34,21 @@ export function calculateDepositAmounts(amount: number, fees: PlatformFees['depo
 }
 
 /**
- * Withdrawal / external PIX pay:
- * - `payoutAmount` = what the recipient receives (full amount)
- * - `feeAmount` = platform fee (R$ 0,80 fixed)
- * - `totalDebit` = what is removed from the user's wallet (amount + fee)
+ * Saque / PIX externo:
+ * - totalDebit = valor informado (sai da carteira)
+ * - feeAmount = taxa fixa (descontada do valor)
+ * - payoutAmount = o que o destinatário realmente recebe (amount - fee)
  */
-export function calculateWithdrawalAmounts(amount: number, fees: PlatformFees['withdrawal']) {
+export function calculateWithdrawalAmounts(amount: number, fees: PlatformFees["withdrawal"]) {
+  const gross = Math.round(Number(amount) * 100) / 100;
   const feeAmount = Math.round(Number(fees.fixed || 0) * 100) / 100;
-  const payoutAmount = Math.round(Number(amount) * 100) / 100;
-  const totalDebit = Math.round((payoutAmount + feeAmount) * 100) / 100;
+  const payoutAmount = Math.round((gross - feeAmount) * 100) / 100;
+  const totalDebit = gross;
 
   return {
     feeAmount,
-    /** @deprecated use payoutAmount — kept for compatibility */
-    netAmount: payoutAmount,
-    payoutAmount,
+    netAmount: Math.max(0, payoutAmount),
+    payoutAmount: Math.max(0, payoutAmount),
     totalDebit,
   };
 }

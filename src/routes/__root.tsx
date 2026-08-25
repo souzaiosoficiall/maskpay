@@ -32,7 +32,7 @@ function NotFoundComponent() {
       </div>
 
       <div className="text-center">
-        <h2 className="text-2xl font-bold tracking-tight mb-2 uppercase">Ops, pagina nao encontrada</h2>
+        <h2 className="text-2xl font-bold tracking-tight mb-2 uppercase">Ops, página não encontrada</h2>
         <div className="text-[12rem] font-black tracking-tighter leading-none opacity-5 mb-8 select-none">
           404
         </div>
@@ -65,7 +65,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
       </div>
       
       <div className="text-center">
-        <h2 className="text-2xl font-bold tracking-tight mb-2 uppercase">Ops, pagina nao encontrada</h2>
+        <h2 className="text-2xl font-bold tracking-tight mb-2 uppercase">Ops, página não encontrada</h2>
         <div className="text-[12rem] font-black tracking-tighter leading-none opacity-5 mb-8 select-none">
           ERR
         </div>

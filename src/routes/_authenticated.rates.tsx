@@ -82,7 +82,7 @@ function RatesPage() {
           <div className="space-y-2">
             <h4 className="text-xs font-black uppercase tracking-widest text-white">Sobre o Recebimento</h4>
             <p className="text-xs text-muted-foreground/60 leading-relaxed font-medium">
-              As taxas são deduzidas automaticamente de cada transação. O saldo fica disponível para saque conforme o prazo de liberação de cada método.
+              Em todas as operações a taxa é descontada do valor: no depósito você recebe o líquido; no saque o destinatário recebe o valor menos a taxa. O saldo fica disponível para saque conforme o prazo de liberação de cada método.
             </p>
           </div>
         </CardContent>

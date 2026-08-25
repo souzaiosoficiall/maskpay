@@ -23,7 +23,7 @@ function resolveEvoPayToken(route: EvoPayRoute = 'WHITE'): string {
     if (!black) {
       console.error('[Audit] EVOPAY_API_TOKEN_BLACK is NOT configured.');
       throw new Error(
-        'Configuração de pagamento BLACK ausente (EVOPAY_API_TOKEN_BLACK).',
+        'Configuração de pagamento da rota BLACK ausente. Contate o suporte.',
       );
     }
     return black.trim();
@@ -31,9 +31,21 @@ function resolveEvoPayToken(route: EvoPayRoute = 'WHITE'): string {
   const white = process.env['EVOPAY_API_TOKEN'];
   if (!white) {
     console.error('[Audit] EVOPAY_API_TOKEN is NOT configured in the environment.');
-    throw new Error('Configuração de pagamento ausente (Token não encontrado).');
+    throw new Error('Configuração de pagamento ausente. Contate o suporte.');
   }
   return white.trim();
+}
+
+
+function sanitizeProviderMessage(msg: string): string {
+  let s = String(msg || '').trim();
+  if (!s) return 'Erro na comunicação com a adquirente.';
+  s = s.replace(/evopay/gi, 'adquirente');
+  s = s.replace(/Evo\s*Pay/gi, 'adquirente');
+  // Don't leak internal URLs/tokens
+  s = s.replace(/https?:\/\/\S+/gi, '');
+  if (s.length > 180) s = s.slice(0, 180) + '…';
+  return s || 'Erro na comunicação com a adquirente.';
 }
 
 export async function callEvoPay(endpoint: string, options: ProviderRequestOptions = {}) {
@@ -111,7 +123,7 @@ export async function callEvoPay(endpoint: string, options: ProviderRequestOptio
       }
 
       throw new Error(
-        typeof detail === 'string' ? detail : "Erro na comunicação com a adquirente."
+        typeof detail === 'string' ? sanitizeProviderMessage(detail) : "Erro na comunicação com a adquirente."
       );
     }
 

@@ -146,7 +146,7 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
           keys: evoData && typeof evoData === "object" ? Object.keys(evoData) : [],
         });
         throw new Error(
-          "A adquirente criou a cobrança, mas não retornou o código Pix. Verifique os logs do servidor."
+          "A adquirente criou a cobrança, mas não retornou o código Pix. Tente novamente."
         );
       }
 
@@ -163,7 +163,7 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
       };
     } catch (err: any) {
       console.error("Payment Provider Audit Failure:", err);
-      throw new Error(err.message || "ERRO VINDO DA RESPOSTA DA ADQUIRENTE");
+      throw new Error(err.message || "Erro na resposta da adquirente.");
     }
   });
 
@@ -216,7 +216,7 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
 
     if (!wallet || Number(wallet.balance || 0) < totalDebit) {
       throw new Error(
-        `Saldo insuficiente. Necessário R$ ${totalDebit.toFixed(2)} (valor + taxa de R$ ${feeAmount.toFixed(2)}).`
+        `Saldo insuficiente. Necessário R$ ${totalDebit.toFixed(2)} (a taxa de R$ ${feeAmount.toFixed(2)} já está descontada do valor enviado).`
       );
     }
 
@@ -243,14 +243,14 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
     if (txError) throw new Error(txError.message);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Debit full amount + platform fee from user balance
+    // Debit requested amount from user balance (fee deducted from payout)
     await supabaseAdmin.rpc("adjust_wallet_balance", {
       p_wallet_id: wallet.id,
       p_amount: -totalDebit,
     });
 
     try {
-      // Recipient receives the FULL requested amount (fee stays with the platform)
+      // Recipient receives amount minus platform fee (fee is deducted from the amount)
       const paymentRoute = await getUserPaymentRoute(supabase, userId);
       const evoData = await callEvoPay("/pix/cash-out", { route: paymentRoute, 
         method: "POST",
@@ -384,8 +384,13 @@ export const payPixQrCode = createServerFn({ method: "POST" })
     }
 
     const feesResp = await fetchPlatformFees(supabase, await getUserPaymentRoute(supabase, userId));
-    const feeAmount = Number(feesResp.withdrawal?.fixed ?? 0.8);
-    const totalDebit = Math.round((payAmount + feeAmount) * 100) / 100;
+    const { feeAmount, payoutAmount, totalDebit } = calculateWithdrawalAmounts(
+      payAmount,
+      feesResp.withdrawal,
+    );
+    if (payoutAmount <= 0) {
+      throw new Error("Valor insuficiente após desconto da taxa.");
+    }
 
     const { data: wallet } = await supabase
       .from("wallets")
@@ -395,7 +400,7 @@ export const payPixQrCode = createServerFn({ method: "POST" })
 
     if (!wallet || Number(wallet.balance || 0) < totalDebit) {
       throw new Error(
-        `Saldo insuficiente. Necessário ${totalDebit.toFixed(2)} (valor + taxa de R$ ${feeAmount.toFixed(2)}).`
+        `Saldo insuficiente. Necessário R$ ${totalDebit.toFixed(2)}.`
       );
     }
 
@@ -404,7 +409,7 @@ export const payPixQrCode = createServerFn({ method: "POST" })
         wallet_id: wallet.id,
         amount: totalDebit,
         fee_amount: feeAmount,
-        net_amount: payAmount,
+        net_amount: payoutAmount,
         type: "pix_payment",
         status: "pending",
         description: `Pagamento PIX QR${data.merchantName ? ` — ${data.merchantName}` : ""}`,
@@ -414,6 +419,7 @@ export const payPixQrCode = createServerFn({ method: "POST" })
           merchant_name: data.merchantName || null,
           emv: emv || data.emv || null,
           pay_amount: payAmount,
+          payout: payoutAmount,
         },
       })
       .select()
@@ -432,7 +438,7 @@ export const payPixQrCode = createServerFn({ method: "POST" })
       const evoData = await callEvoPay("/pix/cash-out", { route: paymentRoute, 
         method: "POST",
         body: {
-          amount: Number(payAmount.toFixed(2)),
+          amount: Number(payoutAmount.toFixed(2)),
           pixKey,
           pixKeyType,
           clientReference: String(tx.id),
@@ -472,7 +478,7 @@ export const payPixQrCode = createServerFn({ method: "POST" })
     return {
       success: true,
       transactionId: tx.id,
-      paid: payAmount,
+      paid: payoutAmount,
       fee: feeAmount,
       totalDebit,
     };

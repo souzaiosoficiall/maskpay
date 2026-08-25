@@ -71,17 +71,17 @@ function WithdrawPage() {
     return Number(fees.withdrawal.fixed || 0);
   }, [fees, amount]);
 
-  // Recipient receives the full amount; fee is extra debit from the user
-  const payoutAmount = useMemo(() => {
+  // Taxa DESCONTA do valor: sai da conta o valor informado; destinatário recebe valor - taxa
+  const totalDebit = useMemo(() => {
     if (!amount || isNaN(parseFloat(amount))) return 0;
-    return parseFloat(amount);
+    return Math.round(parseFloat(amount) * 100) / 100;
   }, [amount]);
 
-  const totalDebit = useMemo(() => {
-    return Math.round((payoutAmount + calculatedFee) * 100) / 100;
-  }, [payoutAmount, calculatedFee]);
+  const payoutAmount = useMemo(() => {
+    return Math.max(0, Math.round((totalDebit - calculatedFee) * 100) / 100);
+  }, [totalDebit, calculatedFee]);
 
-  const netAmount = payoutAmount; // compat for any leftover refs
+  const netAmount = payoutAmount;
 
 
 
@@ -194,12 +194,16 @@ function WithdrawPage() {
                        {parseFloat(amount) > 0 && (
                          <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                             <span>Taxa de saque</span>
-                             <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedFee)}</span>
+                             <span>Taxa de saque (descontada)</span>
+                             <span className="text-red-400">− {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedFee)}</span>
+                           </div>
+                           <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                             <span>Sai da sua conta</span>
+                             <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalDebit)}</span>
                            </div>
                            <div className="flex justify-between text-xs font-black uppercase tracking-widest text-white">
-                             <span>Valor a receber</span>
-                             <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalDebit)}</span>
+                             <span>Destinatário recebe</span>
+                             <span className="text-green-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(payoutAmount)}</span>
                            </div>
                          </div>
                        )}
@@ -228,19 +232,23 @@ function WithdrawPage() {
           <DialogHeader className="space-y-4">
             <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-center">Confirmar Saque</DialogTitle>
             <DialogDescription className="text-sm font-bold text-muted-foreground uppercase tracking-widest text-center leading-relaxed">
-              Confirme os dados da sua retirada. O valor será enviado para a chave Pix informada.
+              A taxa é descontada do valor do saque. O destinatário recebe o valor menos a taxa.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 my-8">
             <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Valor Bruto</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Valor do saque</span>
                 <span className="text-lg font-black text-white">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(amount) || 0)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Taxa</span>
-                <span className="text-lg font-black text-red-500">-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedFee)}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Taxa (descontada)</span>
+                <span className="text-lg font-black text-red-500">−{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedFee)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Destinatário recebe</span>
+                <span className="text-lg font-black text-green-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(payoutAmount)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Destinatário recebe</span>
