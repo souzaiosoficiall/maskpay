@@ -259,11 +259,11 @@ function DashboardPage() {
   );
 
   const promoBanner = (
-    <div className="w-full overflow-hidden rounded-2xl border border-white/10 shadow-[0_6px_20px_rgba(0,0,0,0.3)] sm:rounded-3xl">
+    <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_6px_20px_rgba(0,0,0,0.3)] sm:rounded-3xl">
       <img
         src="/assets/dashboard-banner.png"
         alt="MaskPay — Gateway feito para você vender mais"
-        className="block h-[88px] w-full object-cover object-center sm:h-[100px]"
+        className="mx-auto block h-auto w-full max-h-[120px] object-contain object-center sm:max-h-[140px]"
         loading="eager"
         decoding="async"
       />
@@ -480,13 +480,13 @@ function DashboardPage() {
       <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-white/[0.03] blur-3xl" />
       <div className="pointer-events-none absolute -right-16 top-40 h-72 w-72 rounded-full bg-emerald-500/[0.04] blur-3xl" />
 
-      {/* Banner compacto no topo (largura total, altura controlada) */}
+      {/* Banner no topo: imagem inteira, altura limitada para não dominar o dashboard */}
       <div className="relative mb-5">
-        <div className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_8px_28px_rgba(0,0,0,0.35)] lg:rounded-3xl">
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_8px_28px_rgba(0,0,0,0.35)] lg:rounded-3xl">
           <img
             src="/assets/dashboard-banner.png"
             alt="MaskPay — Gateway feito para você vender mais"
-            className="block h-[120px] w-full object-cover object-center xl:h-[140px]"
+            className="mx-auto block h-auto w-full max-h-[160px] object-contain object-center xl:max-h-[180px]"
             loading="eager"
             decoding="async"
           />
