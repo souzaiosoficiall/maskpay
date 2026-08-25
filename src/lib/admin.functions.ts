@@ -100,8 +100,125 @@ export const updateKycStatus = createServerFn({ method: "POST" })
 
     if (requestError) throw new Error(requestError.message);
 
+    // Notify user when account is approved (email + push)
+    if (data.status === 'verified') {
+      try {
+        const { data: targetProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', data.userId)
+          .maybeSingle();
+
+        const toEmail = targetProfile?.email;
+        const name = (targetProfile?.full_name || '').trim() || 'usuário';
+
+        if (toEmail) {
+          await sendAccountStatusEmail({
+            to: toEmail,
+            fullName: name,
+            kind: 'verified',
+          });
+        }
+
+        try {
+          const { sendPushToUser } = await import('@/lib/push-send.server');
+          await sendPushToUser(data.userId, {
+            title: 'Conta aprovada — MaskPay',
+            body: 'Sua conta foi liberada! Entre no app para começar a usar.',
+            url: '/dashboard',
+            tag: 'kyc-verified',
+          });
+        } catch (pushErr) {
+          console.error('[updateKycStatus] push failed:', pushErr);
+        }
+      } catch (notifyErr) {
+        console.error('[updateKycStatus] notify failed:', notifyErr);
+      }
+    }
+
+    if (data.status === 'rejected') {
+      try {
+        const { data: targetProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', data.userId)
+          .maybeSingle();
+        if (targetProfile?.email) {
+          await sendAccountStatusEmail({
+            to: targetProfile.email,
+            fullName: (targetProfile.full_name || '').trim() || 'usuário',
+            kind: 'rejected',
+          });
+        }
+      } catch (e) {
+        console.error('[updateKycStatus] reject email failed:', e);
+      }
+    }
+
     return { success: true };
   });
+
+/** Best-effort transactional email (Resend if RESEND_API_KEY is set). */
+async function sendAccountStatusEmail(opts: {
+  to: string;
+  fullName: string;
+  kind: 'verified' | 'rejected';
+}) {
+  const resendKey = process.env['RESEND_API_KEY'];
+  const from =
+    process.env['RESEND_FROM_EMAIL'] ||
+    process.env['EMAIL_FROM'] ||
+    'MaskPay <onboarding@resend.dev>';
+
+  const subject =
+    opts.kind === 'verified'
+      ? 'Sua conta MaskPay foi aprovada!'
+      : 'Atualização da verificação MaskPay';
+
+  const html =
+    opts.kind === 'verified'
+      ? `<div style="font-family:sans-serif;line-height:1.5;color:#111">
+          <h2>Olá, ${opts.fullName}!</h2>
+          <p>Sua conta na <strong>MaskPay</strong> foi <strong>aprovada</strong>.</p>
+          <p>Você já pode entrar no painel e utilizar depósito, saque, transferências e demais recursos.</p>
+          <p style="margin-top:24px"><a href="${process.env['SITE_URL'] || 'https://pagamentosonaseguro.online'}/auth?mode=login" style="background:#111;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700">Acessar MaskPay</a></p>
+          <p style="color:#666;font-size:12px;margin-top:32px">MaskPay — Gateway de pagamentos</p>
+        </div>`
+      : `<div style="font-family:sans-serif;line-height:1.5;color:#111">
+          <h2>Olá, ${opts.fullName}</h2>
+          <p>Sua verificação na MaskPay não foi aprovada. Entre em contato com o suporte se precisar de ajuda.</p>
+        </div>`;
+
+  if (!resendKey) {
+    console.warn(
+      '[sendAccountStatusEmail] RESEND_API_KEY não configurada — e-mail não enviado para',
+      opts.to,
+    );
+    return { sent: false as const };
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [opts.to],
+      subject,
+      html,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error('[sendAccountStatusEmail] Resend error:', res.status, body);
+    return { sent: false as const };
+  }
+
+  return { sent: true as const };
+}
 
 /** Normalize storage path (strip bucket prefix / full URL if present). */
 function normalizeKycPath(raw: string | null | undefined): string | null {

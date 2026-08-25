@@ -297,12 +297,33 @@ function AuthenticatedLayout() {
     return <AppLockScreen onUnlocked={handleUnlocked} />;
   }
 
-  // After account is accepted (verified), force 4-digit PIN setup once
+  // PIN obrigatório assim que entra (antes dos documentos / liberação)
   const needsPinSetup =
     !!profile &&
     profile.role !== 'admin' &&
-    profile.verification_status === 'verified' &&
     !profile.transaction_password_hash;
+
+  // Após criar o PIN, se ainda não enviou KYC, manda para /verify
+  useEffect(() => {
+    if (!profile || profile.role === 'admin') return;
+    if (!profile.transaction_password_hash) return; // ainda no modal do PIN
+    if (needsPinSetup) return;
+
+    const status = profile.verification_status;
+    const needsDocs =
+      !status ||
+      status === 'unverified' ||
+      status === '' ||
+      status === null;
+
+    if (!needsDocs) return;
+
+    const path = location.pathname;
+    if (path === '/verify' || path.startsWith('/verify/')) return;
+    if (path === '/support' || path.startsWith('/support/')) return;
+
+    navigate({ to: '/verify', replace: true });
+  }, [profile, needsPinSetup, location.pathname, navigate]);
 
   return (
     <>

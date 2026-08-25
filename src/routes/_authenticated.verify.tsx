@@ -53,6 +53,7 @@ function VerifyPage() {
     selfie: null
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
   
   const navigate = useNavigate();
   const sessionReady = useSessionReady();
@@ -145,18 +146,18 @@ function VerifyPage() {
         }
       });
 
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      
-      toast.success('Documentos enviados com sucesso! O suporte tem até 24 horas para realizar a liberação da conta.');
-      
-      setTimeout(() => {
-        navigate({ to: '/dashboard' });
-      }, 500);
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      setShowPendingModal(true);
     } catch (error: any) {
       toast.error('Erro ao enviar documentos: ' + (error.message || 'Erro desconhecido.'));
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const acknowledgePending = () => {
+    setShowPendingModal(false);
+    navigate({ to: '/dashboard', replace: true });
   };
 
   const nextStep = () => setStep(s => s + 1);
@@ -265,8 +266,18 @@ function VerifyPage() {
               </div>
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex gap-3">
+            <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex gap-3">
               <Fingerprint className="w-5 h-5 text-primary shrink-0" />
+              <p className="text-[11px] font-medium text-muted-foreground leading-relaxed">
+                <strong className="text-white">Por que pedimos documentos?</strong>
+                {' '}A verificação de identidade (KYC) é obrigatória para liberar depósitos,
+                saques e transferências, e protege sua conta contra fraudes. Após o envio,
+                nossa equipe analisa em até 24 horas.
+              </p>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex gap-3">
+              <FileText className="w-5 h-5 text-muted-foreground shrink-0" />
               <p className="text-[10px] font-bold text-muted-foreground/60 uppercase leading-relaxed">
                 Esses dados são carregados do seu cadastro. Se houver algum erro, entre em contato com o suporte antes de prosseguir.
               </p>
@@ -457,6 +468,38 @@ function VerifyPage() {
         <Lock className="w-3 h-3 text-muted-foreground/40" />
         <span className="text-[8px] md:text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">Seus dados estão protegidos por criptografia de ponta a ponta</span>
       </div>
+
+      {showPendingModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+          <div className="relative z-10 w-full max-w-md rounded-[2rem] border border-white/10 bg-[#0c0c0c] p-6 sm:p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex flex-col items-center text-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+                <Check className="w-8 h-8 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 mb-1">
+                  Documentos enviados
+                </p>
+                <h2 className="text-2xl font-black tracking-tighter uppercase">
+                  Análise em até 24h
+                </h2>
+                <p className="text-[12px] font-medium text-muted-foreground mt-3 leading-relaxed">
+                  Nossa equipe vai analisar seus documentos. A liberação da conta
+                  pode levar até <strong className="text-white">24 horas</strong>.
+                  Você receberá um e-mail quando a conta for aprovada.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={acknowledgePending}
+              className="w-full h-14 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-xs"
+            >
+              OK, ENTENDIDO
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -55,7 +55,7 @@ export function SetupTransactionPinModal({ open }: { open: boolean }) {
         old ? { ...old, transaction_password_hash: pin } : old,
       );
       setCompleted(true);
-      toast.success('PIN de transação criado com sucesso!');
+      toast.success('PIN criado! Agora envie seus documentos para liberar a conta.');
       // Background refetch to stay in sync with server
       void queryClient.invalidateQueries({ queryKey: ['profile'] });
     } catch (err: any) {
@@ -75,14 +75,14 @@ export function SetupTransactionPinModal({ open }: { open: boolean }) {
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-1">
-              Conta aprovada
+              Segurança da conta
             </p>
             <h2 className="text-2xl font-black tracking-tighter uppercase">
               Crie seu PIN
             </h2>
             <p className="text-[11px] font-bold text-muted-foreground mt-2 leading-relaxed">
               Defina um PIN de 4 dígitos para confirmar saques e pagamentos via QR Code.
-              Você só precisa fazer isso uma vez.
+              Em seguida você enviará seus documentos para liberar a conta.
             </p>
           </div>
         </div>
