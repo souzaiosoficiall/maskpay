@@ -5,6 +5,24 @@ import { fetchPlatformFees, getUserPaymentRoute } from "./platform-fees.server";
 import { calculateDepositAmounts } from "./fees-logic";
 import { callEvoPay } from "./evopay-client.server";
 
+const feedbackSchema = z.object({
+  name: z.string().min(1).max(80),
+  avatar_url: z.string().max(2_000_000).optional().default(""),
+  comment: z.string().min(1).max(500),
+});
+
+function slugify(title: string) {
+  const base = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `${base || "checkout"}-${suffix}`;
+}
+
 function getWebhookUrl(): string {
   const siteUrl = process.env["SITE_URL"];
   const host = process.env["HOST"];
@@ -37,39 +55,21 @@ function extractPixCodes(evoData: any): { emv: string | null; qrImageBase64: str
   return { emv: emv || null, qrImageBase64: qrImageBase64 || null };
 }
 
-const feedbackSchema = z.object({
-  name: z.string().min(1).max(80),
-  avatar_url: z.string().max(500).optional().default(""),
-  comment: z.string().min(1).max(500),
-});
+/* ───────────── Catálogo de produtos ───────────── */
 
-function slugify(title: string) {
-  const base = title
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
-  const suffix = Math.random().toString(36).slice(2, 8);
-  return `${base || "produto"}-${suffix}`;
-}
-
-export type CheckoutFeedback = z.infer<typeof feedbackSchema>;
-
-export const listMyCheckoutProducts = createServerFn({ method: "GET" })
+export const listMyProducts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data, error } = await (supabase.from("checkout_products") as any)
-      .select("*")
+      .select("id, title, description, amount, icon_url, active, created_at, updated_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return (data || []) as any[];
   });
 
-export const createCheckoutProduct = createServerFn({ method: "POST" })
+export const createProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
     z
@@ -77,10 +77,7 @@ export const createCheckoutProduct = createServerFn({ method: "POST" })
         title: z.string().min(2).max(120),
         description: z.string().max(2000).optional().default(""),
         amount: z.number().min(1),
-        theme_color: z.string().min(4).max(20).optional().default("#22c55e"),
-        banner_url: z.string().max(1000).optional().nullable(),
-        icon_url: z.string().max(1000).optional().nullable(),
-        feedbacks: z.array(feedbackSchema).max(20).optional().default([]),
+        icon_url: z.string().max(2_500_000).optional().nullable(),
         active: z.boolean().optional().default(true),
       })
       .parse(data),
@@ -95,19 +92,19 @@ export const createCheckoutProduct = createServerFn({ method: "POST" })
         title: data.title,
         description: data.description || "",
         amount: data.amount,
-        theme_color: data.theme_color || "#22c55e",
-        banner_url: data.banner_url || null,
+        theme_color: "#6366f1",
+        banner_url: null,
         icon_url: data.icon_url || null,
-        feedbacks: data.feedbacks || [],
+        feedbacks: [],
         active: data.active ?? true,
       })
-      .select()
+      .select("id, title, description, amount, icon_url, active, created_at")
       .single();
     if (error) throw new Error(error.message);
     return row;
   });
 
-export const updateCheckoutProduct = createServerFn({ method: "POST" })
+export const updateProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
     z
@@ -116,10 +113,7 @@ export const updateCheckoutProduct = createServerFn({ method: "POST" })
         title: z.string().min(2).max(120).optional(),
         description: z.string().max(2000).optional(),
         amount: z.number().min(1).optional(),
-        theme_color: z.string().min(4).max(20).optional(),
-        banner_url: z.string().max(1000).optional().nullable(),
-        icon_url: z.string().max(1000).optional().nullable(),
-        feedbacks: z.array(feedbackSchema).max(20).optional(),
+        icon_url: z.string().max(2_500_000).optional().nullable(),
         active: z.boolean().optional(),
       })
       .parse(data),
@@ -135,13 +129,13 @@ export const updateCheckoutProduct = createServerFn({ method: "POST" })
       .update(updates)
       .eq("id", id)
       .eq("user_id", userId)
-      .select()
+      .select("id, title, description, amount, icon_url, active, created_at")
       .single();
     if (error) throw new Error(error.message);
     return row;
   });
 
-export const deleteCheckoutProduct = createServerFn({ method: "POST" })
+export const deleteProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
@@ -154,37 +148,157 @@ export const deleteCheckoutProduct = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-/** Public: load product by slug (no auth). */
-export const getCheckoutProductBySlug = createServerFn({ method: "POST" })
+/* ───────────── Páginas de checkout ───────────── */
+
+export const listMyCheckoutPages = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data, error } = await (supabase.from("checkout_pages") as any)
+      .select(
+        "id, slug, theme_color, banner_url, description, feedbacks, active, product_id, created_at, checkout_products(id, title, amount, icon_url, description)",
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data || []).map((row: any) => ({
+      ...row,
+      product: row.checkout_products || null,
+      checkout_products: undefined,
+    }));
+  });
+
+export const createCheckoutPage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        product_id: z.string().uuid(),
+        theme_color: z.string().min(4).max(20).optional().default("#6366f1"),
+        banner_url: z.string().max(2_500_000).optional().nullable(),
+        description: z.string().max(2000).optional().default(""),
+        feedbacks: z.array(feedbackSchema).max(20).optional().default([]),
+        active: z.boolean().optional().default(true),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: product, error: pErr } = await (supabase.from("checkout_products") as any)
+      .select("id, title")
+      .eq("id", data.product_id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (pErr) throw new Error(pErr.message);
+    if (!product) throw new Error("Produto não encontrado.");
+
+    const slug = slugify(product.title);
+    const { data: row, error } = await (supabase.from("checkout_pages") as any)
+      .insert({
+        user_id: userId,
+        product_id: data.product_id,
+        slug,
+        theme_color: data.theme_color || "#6366f1",
+        banner_url: data.banner_url || null,
+        description: data.description || "",
+        feedbacks: data.feedbacks || [],
+        active: data.active ?? true,
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+export const updateCheckoutPage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        product_id: z.string().uuid().optional(),
+        theme_color: z.string().min(4).max(20).optional(),
+        banner_url: z.string().max(2_500_000).optional().nullable(),
+        description: z.string().max(2000).optional(),
+        feedbacks: z.array(feedbackSchema).max(20).optional(),
+        active: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { id, ...rest } = data;
+    if (rest.product_id) {
+      const { data: product } = await (supabase.from("checkout_products") as any)
+        .select("id")
+        .eq("id", rest.product_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!product) throw new Error("Produto inválido.");
+    }
+    const updates: any = { updated_at: new Date().toISOString() };
+    for (const [k, v] of Object.entries(rest)) {
+      if (v !== undefined) updates[k] = v;
+    }
+    const { data: row, error } = await (supabase.from("checkout_pages") as any)
+      .update(updates)
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+export const deleteCheckoutPage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await (supabase.from("checkout_pages") as any)
+      .delete()
+      .eq("id", data.id)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+/** Público: página de checkout por slug */
+export const getCheckoutBySlug = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ slug: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await (supabaseAdmin.from("checkout_products") as any)
+    const { data: page, error } = await (supabaseAdmin.from("checkout_pages") as any)
       .select(
-        "id, slug, title, description, amount, theme_color, banner_url, icon_url, feedbacks, active, user_id",
+        "id, slug, theme_color, banner_url, description, feedbacks, active, product_id, user_id, checkout_products(id, title, description, amount, icon_url, active)",
       )
       .eq("slug", data.slug)
       .eq("active", true)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!row) throw new Error("Produto não encontrado ou inativo.");
-    // Don't expose merchant user_id to client unnecessarily — keep for payment server-side only via re-fetch
+    if (!page) throw new Error("Checkout não encontrado ou inativo.");
+    const product = page.checkout_products;
+    if (!product || product.active === false) {
+      throw new Error("Produto vinculado indisponível.");
+    }
     return {
-      id: row.id,
-      slug: row.slug,
-      title: row.title,
-      description: row.description,
-      amount: Number(row.amount),
-      theme_color: row.theme_color,
-      banner_url: row.banner_url,
-      icon_url: row.icon_url,
-      feedbacks: Array.isArray(row.feedbacks) ? row.feedbacks : [],
+      id: page.id,
+      slug: page.slug,
+      theme_color: page.theme_color,
+      banner_url: page.banner_url,
+      description: page.description || product.description || "",
+      feedbacks: Array.isArray(page.feedbacks) ? page.feedbacks : [],
+      product: {
+        id: product.id,
+        title: product.title,
+        description: product.description,
+        amount: Number(product.amount),
+        icon_url: product.icon_url,
+      },
     };
   });
 
-/**
- * Public checkout payment: creates order + Pix charge credited to merchant wallet.
- */
 export const createCheckoutPayment = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -199,17 +313,20 @@ export const createCheckoutPayment = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: product, error: pErr } = await (supabaseAdmin.from("checkout_products") as any)
-      .select("*")
+    const { data: page, error: pageErr } = await (supabaseAdmin.from("checkout_pages") as any)
+      .select("*, checkout_products(*)")
       .eq("slug", data.slug)
       .eq("active", true)
       .maybeSingle();
-    if (pErr) throw new Error(pErr.message);
-    if (!product) throw new Error("Produto não encontrado ou inativo.");
+    if (pageErr) throw new Error(pageErr.message);
+    if (!page) throw new Error("Checkout não encontrado ou inativo.");
 
-    const merchantId = product.user_id as string;
+    const product = page.checkout_products;
+    if (!product || product.active === false) throw new Error("Produto indisponível.");
+
+    const merchantId = page.user_id as string;
     const amount = Number(product.amount);
-    if (!amount || amount < 1) throw new Error("Valor do produto inválido.");
+    if (!amount || amount < 1) throw new Error("Valor inválido.");
 
     const paymentRoute = await getUserPaymentRoute(supabaseAdmin, merchantId);
     const feesResp = await fetchPlatformFees(supabaseAdmin, paymentRoute);
@@ -231,7 +348,11 @@ export const createCheckoutPayment = createServerFn({ method: "POST" })
         customer_phone: data.customer_phone,
         amount,
         status: "pending",
-        metadata: { product_title: product.title, slug: product.slug },
+        metadata: {
+          product_title: product.title,
+          slug: page.slug,
+          checkout_page_id: page.id,
+        },
       })
       .select()
       .single();
@@ -250,6 +371,7 @@ export const createCheckoutPayment = createServerFn({ method: "POST" })
           account_route: paymentRoute,
           fee_route: feesResp.route,
           checkout_order_id: order.id,
+          checkout_page_id: page.id,
           checkout_product_id: product.id,
           customer_name: data.customer_name,
           customer_email: data.customer_email,
@@ -289,9 +411,7 @@ export const createCheckoutPayment = createServerFn({ method: "POST" })
       })
       .eq("id", tx.id);
 
-    if (!emv) {
-      throw new Error("A adquirente não retornou o código Pix. Tente novamente.");
-    }
+    if (!emv) throw new Error("A adquirente não retornou o código Pix. Tente novamente.");
 
     return {
       orderId: order.id,
@@ -303,6 +423,6 @@ export const createCheckoutPayment = createServerFn({ method: "POST" })
       copyPaste: emv,
       qrImageBase64: qrImageBase64 || null,
       productTitle: product.title,
-      theme_color: product.theme_color,
+      theme_color: page.theme_color,
     };
   });

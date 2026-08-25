@@ -14,6 +14,7 @@ import {
   Webhook,
   Settings,
   ShoppingBag,
+  Package,
   LogOut,
   FileCode2,
   BookOpen,
@@ -152,6 +153,8 @@ export default function DashboardLayout() {
   };
 
   const moreItems = [
+    { label: 'Checkout', to: '/checkout', icon: ShoppingBag, lock: true },
+    { label: 'Produtos', to: '/products', icon: Package, lock: true },
     { label: 'Depositar', to: '/deposit', icon: ArrowDownToLine, lock: true },
     { label: 'Sacar', to: '/withdraw', icon: ArrowUpFromLine, lock: true },
     { label: 'Transferir', to: '/transfer', icon: ArrowLeftRight, lock: true },
@@ -228,7 +231,8 @@ export default function DashboardLayout() {
 
         {[
           { label: 'Movimentações', to: '/transactions', icon: Webhook, lock: true },
-          { label: 'Checkout', to: '/checkout', icon: ShoppingBag, lock: true },
+          { label: 'Checkout', to: '/checkout', icon: ShoppingBag,
+  Package, lock: true },
           { label: 'Taxas', to: '/rates', icon: Receipt, lock: true },
           { label: 'API', to: '/api-keys', icon: FileCode2, lock: true },
           { label: 'Documentação', to: '/docs', icon: BookOpen, lock: false },

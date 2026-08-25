@@ -32,6 +32,7 @@ import { Route as AuthenticatedWebhooksRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedWithdrawRouteImport } from './routes/_authenticated.withdraw'
 import { Route as AuthenticatedPayQrRouteImport } from './routes/_authenticated.pay-qr'
 import { Route as AuthenticatedCheckoutRouteImport } from './routes/_authenticated.checkout'
+import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated.products'
 import { Route as CSlugRouteImport } from './routes/c.$slug'
 import { Route as AdminIndexRouteImport } from './routes/aylla.index'
 import { Route as AdminLoginRouteImport } from './routes/aylla.login'
@@ -156,6 +157,11 @@ const AuthenticatedCheckoutRoute = AuthenticatedCheckoutRouteImport.update({
   path: '/checkout',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const CSlugRoute = CSlugRouteImport.update({
   id: '/c/$slug',
   path: '/c/$slug',
@@ -220,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/withdraw': typeof AuthenticatedWithdrawRoute
   '/pay-qr': typeof AuthenticatedPayQrRoute
   '/checkout': typeof AuthenticatedCheckoutRoute
+  '/products': typeof AuthenticatedProductsRoute
   '/c/$slug': typeof CSlugRoute
   '/aylla/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/withdraw': typeof AuthenticatedWithdrawRoute
   '/pay-qr': typeof AuthenticatedPayQrRoute
   '/checkout': typeof AuthenticatedCheckoutRoute
+  '/products': typeof AuthenticatedProductsRoute
   '/c/$slug': typeof CSlugRoute
   '/aylla/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -607,6 +615,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedWithdrawRoute: AuthenticatedWithdrawRoute,
   AuthenticatedPayQrRoute: AuthenticatedPayQrRoute,
   AuthenticatedCheckoutRoute: AuthenticatedCheckoutRoute,
+  AuthenticatedProductsRoute: AuthenticatedProductsRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
