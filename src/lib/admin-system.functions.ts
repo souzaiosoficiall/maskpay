@@ -444,3 +444,70 @@ export const updatePlatformFees = createServerFn({ method: "POST" })
 
     return { success: true };
   });
+
+
+export const getAdminDiagnostics = createServerFn({ method: "GET" })
+  .middleware([requireAdminRole])
+  .handler(async ({ context }: { context: any }) => {
+    await ensureAdmin(context);
+    const url =
+      process.env["SUPABASE_URL"] ||
+      process.env["VITE_SUPABASE_URL"] ||
+      null;
+    const serviceKey =
+      process.env["SUPABASE_SERVICE_ROLE_KEY"] ||
+      process.env["SUPABASE_SECRET_KEY"] ||
+      null;
+    const publishable = Boolean(
+      process.env["SUPABASE_PUBLISHABLE_KEY"] ||
+        process.env["VITE_SUPABASE_PUBLISHABLE_KEY"],
+    );
+
+    let profilesCount: number | null = null;
+    let profilesError: string | null = null;
+    let authUsersCount: number | null = null;
+    let authError: string | null = null;
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { count, error } = await supabaseAdmin
+        .from("profiles")
+        .select("id", { count: "exact", head: true });
+      if (error) profilesError = error.message;
+      else profilesCount = count ?? 0;
+
+      if (serviceKey) {
+        try {
+          const { data, error: aErr } = await supabaseAdmin.auth.admin.listUsers({
+            perPage: 1,
+          });
+          if (aErr) authError = aErr.message;
+          else authUsersCount = data?.users?.length ?? null;
+        } catch (e: any) {
+          authError = e?.message || String(e);
+        }
+      }
+    } catch (e: any) {
+      profilesError = e?.message || String(e);
+    }
+
+    return {
+      hasSupabaseUrl: Boolean(url),
+      supabaseHost: url ? String(url).replace(/^https?:\/\//, "").split("/")[0] : null,
+      hasServiceRoleKey: Boolean(serviceKey),
+      serviceKeyLooksJwt: Boolean(serviceKey && String(serviceKey).startsWith("eyJ")),
+      serviceKeyLooksSecret: Boolean(serviceKey && String(serviceKey).startsWith("sb_secret_")),
+      hasPublishableKey: publishable,
+      profilesCount,
+      profilesError,
+      authUsersProbe: authUsersCount,
+      authError,
+      hint: !serviceKey
+        ? "SERVICE_ROLE ausente no runtime — faça Redeploy após salvar a variável."
+        : profilesError
+          ? "Service role presente, mas a query falhou. Confira se SUPABASE_URL é do mesmo projeto da chave."
+          : profilesCount === 0
+            ? "Conectou, mas profiles está vazio neste projeto Supabase."
+            : "OK — service role enxerga os profiles.",
+    };
+  });

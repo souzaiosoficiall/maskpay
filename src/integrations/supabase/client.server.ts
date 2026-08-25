@@ -31,9 +31,18 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env['SUPABASE_URL'];
-  const SUPABASE_SERVICE_ROLE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'];
-  const SUPABASE_PUBLISHABLE_KEY = process.env['SUPABASE_PUBLISHABLE_KEY'];
+  const SUPABASE_URL =
+    process.env['SUPABASE_URL'] ||
+    process.env['VITE_SUPABASE_URL'] ||
+    process.env['NEXT_PUBLIC_SUPABASE_URL'];
+  const SUPABASE_SERVICE_ROLE_KEY =
+    process.env['SUPABASE_SERVICE_ROLE_KEY'] ||
+    process.env['SUPABASE_SECRET_KEY'] ||
+    process.env['SUPABASE_SERVICE_KEY'];
+  const SUPABASE_PUBLISHABLE_KEY =
+    process.env['SUPABASE_PUBLISHABLE_KEY'] ||
+    process.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
+    process.env['SUPABASE_ANON_KEY'];
 
   // Fallback: when no service role key is configured (e.g. project transferred
   // without secrets), act as the calling user by forwarding their bearer token.
