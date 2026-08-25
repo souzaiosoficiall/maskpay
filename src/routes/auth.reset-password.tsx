@@ -31,6 +31,25 @@ function ResetPasswordPage() {
 
   useEffect(() => {
     let cancelled = false;
+    try {
+      sessionStorage.setItem('maskpay-password-recovery', '1');
+    } catch {
+      // ignore
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        try {
+          sessionStorage.setItem('maskpay-password-recovery', '1');
+        } catch {
+          // ignore
+        }
+        if (!cancelled) {
+          setPhase('form');
+          setMessage('');
+        }
+      }
+    });
 
     (async () => {
       try {
@@ -39,12 +58,16 @@ function ResetPasswordPage() {
         const errorDescription =
           url.searchParams.get('error_description') ||
           url.searchParams.get('error');
-        const type = url.searchParams.get('type');
+        const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+        const hashType = hashParams.get('type');
+        const hashError = hashParams.get('error_description') || hashParams.get('error');
 
-        if (errorDescription) {
+        if (errorDescription || hashError) {
           if (!cancelled) {
             setPhase('error');
-            setMessage(decodeURIComponent(errorDescription.replace(/\+/g, ' ')));
+            setMessage(
+              decodeURIComponent((errorDescription || hashError || '').replace(/\+/g, ' ')),
+            );
           }
           return;
         }
@@ -57,13 +80,27 @@ function ResetPasswordPage() {
             if (!data.session) throw error;
           }
         } else {
-          // Hash fragment flow (older) — detectSessionInUrl may already have session
-          const { data } = await supabase.auth.getSession();
-          if (!data.session) {
-            // Wait briefly for client to parse hash
-            await new Promise((r) => setTimeout(r, 400));
-            const again = await supabase.auth.getSession();
-            if (!again.data.session) {
+          // Hash fragment / already-parsed session
+          let session = (await supabase.auth.getSession()).data.session;
+          if (!session) {
+            await new Promise((r) => setTimeout(r, 600));
+            session = (await supabase.auth.getSession()).data.session;
+          }
+          // Allow form if recovery flag was set from auth event even without waiting forever
+          if (!session && sessionStorage.getItem('maskpay-password-recovery') !== '1') {
+            if (!cancelled) {
+              setPhase('error');
+              setMessage(
+                'Link inválido ou expirado. Solicite um novo e-mail de redefinição.',
+              );
+            }
+            return;
+          }
+          if (!session) {
+            // last wait for detectSessionInUrl
+            await new Promise((r) => setTimeout(r, 800));
+            session = (await supabase.auth.getSession()).data.session;
+            if (!session) {
               if (!cancelled) {
                 setPhase('error');
                 setMessage(
@@ -75,15 +112,9 @@ function ResetPasswordPage() {
           }
         }
 
-        // Optional: listen for PASSWORD_RECOVERY event
-        if (type === 'recovery' || true) {
-          // session is enough to call updateUser
-        }
-
         if (!cancelled) {
           setPhase('form');
           setMessage('');
-          // Clean sensitive params from URL bar
           try {
             window.history.replaceState({}, '', '/auth/reset-password');
           } catch {
@@ -104,6 +135,7 @@ function ResetPasswordPage() {
 
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -145,6 +177,11 @@ function ResetPasswordPage() {
         // ignore
       }
 
+      try {
+        sessionStorage.removeItem('maskpay-password-recovery');
+      } catch {
+        // ignore
+      }
       setPhase('done');
       toast.success('Senha alterada com sucesso!');
     } catch (err: any) {

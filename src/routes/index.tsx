@@ -212,7 +212,7 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 function LandingPage() {
-  // If already logged in, skip homepage and go straight to the account (lock screen / dashboard)
+  // If already logged in, skip homepage — but NEVER skip password recovery
   useEffect(() => {
     let cancelled = false;
     if (isSecurityLocked()) {
@@ -220,13 +220,52 @@ function LandingPage() {
       supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
       return;
     }
+
+    const recoveryFromUrl = () => {
+      try {
+        const u = new URL(window.location.href);
+        if (u.searchParams.get('type') === 'recovery') return true;
+        const hash = u.hash.replace(/^#/, '');
+        if (hash && new URLSearchParams(hash).get('type') === 'recovery') return true;
+        if (sessionStorage.getItem('maskpay-password-recovery') === '1') return true;
+      } catch {
+        // ignore
+      }
+      return false;
+    };
+
+    if (recoveryFromUrl()) {
+      const q = window.location.search || '';
+      const h = window.location.hash || '';
+      window.location.replace(`/auth/reset-password${q}${h}`);
+      return;
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        try {
+          sessionStorage.setItem('maskpay-password-recovery', '1');
+        } catch {
+          // ignore
+        }
+        window.location.replace('/auth/reset-password');
+      }
+    });
+
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
+      if (sessionStorage.getItem('maskpay-password-recovery') === '1') {
+        window.location.replace('/auth/reset-password');
+        return;
+      }
       if (data.session?.access_token) {
         window.location.replace('/dashboard');
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const [revenue, setRevenue] = useState(17080);

@@ -34,8 +34,7 @@ function AuthPage() {
   const isForgot = mode === 'forgot';
   const isRegister = mode === 'register';
 
-  // Already logged in → skip login screen (session restored from localStorage)
-  // If security lock is active (DevTools was opened), force logout and stay on login.
+  // Already logged in → dashboard (EXCEPT password recovery session)
   useEffect(() => {
     let cancelled = false;
     if (isSecurityLocked()) {
@@ -43,13 +42,58 @@ function AuthPage() {
       supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
       return;
     }
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      if (data.session?.access_token) {
-        window.location.href = '/dashboard';
+
+    const isRecoveryUrl = () => {
+      try {
+        const u = new URL(window.location.href);
+        if (u.pathname.includes('reset-password')) return true;
+        if (u.searchParams.get('type') === 'recovery') return true;
+        const hash = u.hash.replace(/^#/, '');
+        if (hash && new URLSearchParams(hash).get('type') === 'recovery') return true;
+        if (sessionStorage.getItem('maskpay-password-recovery') === '1') return true;
+      } catch {
+        // ignore
+      }
+      return false;
+    };
+
+    // Recovery link landed on /auth → send to dedicated page (keep query/hash)
+    if (isRecoveryUrl() && !window.location.pathname.includes('reset-password')) {
+      const q = window.location.search || '';
+      const h = window.location.hash || '';
+      window.location.replace(`/auth/reset-password${q}${h}`);
+      return;
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        try {
+          sessionStorage.setItem('maskpay-password-recovery', '1');
+        } catch {
+          // ignore
+        }
+        if (!window.location.pathname.includes('reset-password')) {
+          window.location.replace('/auth/reset-password');
+        }
       }
     });
-    return () => { cancelled = true; };
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (!data.session?.access_token) return;
+      if (isRecoveryUrl()) {
+        if (!window.location.pathname.includes('reset-password')) {
+          window.location.replace('/auth/reset-password');
+        }
+        return;
+      }
+      window.location.href = '/dashboard';
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
   const [step, setStep] = useState(1);
   const [accountType, setAccountType] = useState<'PF' | 'PJ'>('PF');
