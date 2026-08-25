@@ -132,7 +132,9 @@ function SettingsPage() {
               </AvatarFallback>
             </Avatar>
             <div className="text-center md:text-left space-y-2">
-              <h2 className="text-3xl font-black uppercase tracking-tighter">{profile?.full_name}</h2>
+              <h2 className="text-3xl font-black uppercase tracking-tighter">
+                {(profile?.full_name || '').trim() || 'Usuário'}
+              </h2>
               <div className="flex flex-wrap justify-center md:justify-start gap-3">
                 <span className="px-4 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-widest">
                   Conta {profile?.verification_status === 'verified' ? 'Verificada' : 'Pendente'}
@@ -170,20 +172,20 @@ function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">E-mail</Label>
-                  <div className="bg-white/5 border border-white/10 rounded-2xl h-16 flex items-center px-6 font-bold text-white">
-                    {maskEmail(profile?.email)}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl h-16 flex items-center px-6 font-bold text-white break-all">
+                    {profile?.email || 'Não informado'}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">WhatsApp / Telefone</Label>
                   <div className="bg-white/5 border border-white/10 rounded-2xl h-16 flex items-center px-6 font-bold text-white">
-                    {profile?.phone ? maskPhone(profile.phone) : 'Não informado'}
+                    {profile?.phone?.trim() ? profile.phone : 'Não informado'}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">CPF / CNPJ</Label>
                   <div className="bg-white/5 border border-white/10 rounded-2xl h-16 flex items-center px-6 font-bold text-white">
-                    {profile?.document ? maskDocument(profile.document) : 'Não informado'}
+                    {profile?.document?.trim() ? profile.document : 'Não informado'}
                   </div>
                 </div>
               </div>

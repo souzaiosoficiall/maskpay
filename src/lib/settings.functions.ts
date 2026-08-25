@@ -94,7 +94,7 @@ export const getProfile = createServerFn({ method: "GET" })
       };
     };
 
-    // Force sync from Auth metadata if the record exists but fields are null
+    // Force sync from Auth metadata whenever profile fields are missing/empty
     if (data) {
       let authUser: any = null;
       try {
@@ -103,14 +103,31 @@ export const getProfile = createServerFn({ method: "GET" })
       } catch (e) {
         console.error('[getProfile] getUserById failed:', e);
       }
-      if (authUser?.user_metadata) {
-        const meta = authUser.user_metadata;
+      if (authUser) {
+        const meta = authUser.user_metadata || {};
         const updates: any = {};
-        
-        if (!data.full_name || data.full_name === 'Proprietário') updates.full_name = meta['full_name'] || meta['name'];
-        if (!data.document) updates.document = meta['document'];
-        if (!data.phone) updates.phone = meta['phone'];
-        if (!data.email) updates.email = authUser.email;
+
+        const metaName =
+          (typeof meta['full_name'] === 'string' && meta['full_name'].trim()) ||
+          (typeof meta['name'] === 'string' && meta['name'].trim()) ||
+          '';
+        const metaDocument =
+          (typeof meta['document'] === 'string' && meta['document'].trim()) || '';
+        const metaPhone =
+          (typeof meta['phone'] === 'string' && meta['phone'].trim()) || '';
+
+        const currentName = (data.full_name || '').trim();
+        const nameIsPlaceholder =
+          !currentName ||
+          currentName === 'Proprietário' ||
+          currentName === 'Usuário sem Nome' ||
+          currentName.toLowerCase() === 'usuário' ||
+          currentName.toLowerCase() === 'usuario';
+
+        if (nameIsPlaceholder && metaName) updates.full_name = metaName;
+        if (!(data.document || '').trim() && metaDocument) updates.document = metaDocument;
+        if (!(data.phone || '').trim() && metaPhone) updates.phone = metaPhone;
+        if (!(data.email || '').trim() && authUser.email) updates.email = authUser.email;
 
         if (Object.keys(updates).length > 0) {
           const { data: updated } = await supabaseAdmin
@@ -121,9 +138,15 @@ export const getProfile = createServerFn({ method: "GET" })
               'id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at, transaction_password_hash',
             )
             .maybeSingle();
-          
+
           if (updated) data = updated;
         }
+
+        // In-memory fallback so UI never shows empty name when metadata exists
+        if (!(data.full_name || '').trim() && metaName) data = { ...data, full_name: metaName };
+        if (!(data.document || '').trim() && metaDocument) data = { ...data, document: metaDocument };
+        if (!(data.phone || '').trim() && metaPhone) data = { ...data, phone: metaPhone };
+        if (!(data.email || '').trim() && authUser.email) data = { ...data, email: authUser.email };
       }
     }
 

@@ -14,6 +14,7 @@ import maskPlatformAsset from "@/lib/mask-asset";
 import { AuthVisualPanel } from '@/components/AuthVisualPanel';
 import { useServerFn } from '@tanstack/react-start';
 import { validateCPFAction } from '@/lib/identity.functions';
+import { registerUser } from '@/lib/register.functions';
 
 
 export const Route = createFileRoute('/auth')({
@@ -68,6 +69,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const validateCPFServer = useServerFn(validateCPFAction);
+  const registerUserServer = useServerFn(registerUser);
   const [isValidatingCPF, setIsValidatingCPF] = useState(false);
   const [isCPFVerified, setIsCPFVerified] = useState(false);
 
@@ -252,77 +254,30 @@ function AuthPage() {
         return;
       }
 
-      // Registration — confirmation email is sent by Supabase (custom SMTP / Resend)
-      const siteUrl =
-        (typeof window !== 'undefined' ? window.location.origin : '') ||
-        'https://pagamentosonaseguro.online';
-
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          // After confirming the email, land on the success screen (then user goes to login)
-          emailRedirectTo: `${siteUrl}/auth/confirmed`,
-          data: {
-            full_name: fullName,
-            document: document,
-            phone: phone,
-            revenue_bracket: revenue,
-            account_type: accountType,
-          },
+      // Registration via server (service role) so profile always gets full_name/document/phone
+      await registerUserServer({
+        data: {
+          email: email.trim(),
+          password,
+          fullName: fullName.trim(),
+          document: document.trim(),
+          phone: phone.trim(),
+          revenue: revenue || undefined,
+          accountType: accountType as 'PF' | 'PJ',
         },
       });
 
-      if (signUpError) throw signUpError;
-
-      if (signUpData.user) {
-        const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
-        const isOwner = email.toLowerCase() === OWNER_EMAIL.toLowerCase();
-
-        // Profile starts locked (KYC). Only owner is auto-verified.
-        // kyc_status stays unverified until the user submits documents.
-        await supabase.from('profiles').upsert({
-          id: signUpData.user.id,
-          email: email.trim(),
-          full_name: fullName.trim(),
-          document: document.trim(),
-          phone: phone.trim(),
-          kyc_status: isOwner ? 'verified' : 'unverified',
-          verification_status: isOwner ? 'verified' : 'unverified',
-          status: 'active',
-          account_route: 'WHITE',
-        });
-
-        // If email confirmation is required, Supabase returns a user but often NO session.
-        const hasSession = !!signUpData.session?.access_token;
-        const emailConfirmed = !!(signUpData.user as any).email_confirmed_at;
-
-        if (!hasSession || !emailConfirmed) {
-          // Do NOT send user to dashboard — ask them to confirm email first
-          try {
-            await supabase.auth.signOut({ scope: 'local' });
-          } catch {
-            // ignore
-          }
-          setPendingConfirmEmail(email.trim());
-          setAwaitingEmailConfirm(true);
-          toast.success('Conta criada! Verifique seu e-mail para confirmar.');
-          setIsLoading(false);
-          return;
-        }
-
-        // Email already confirmed (e.g. confirm-email disabled in Supabase) → enter app locked for KYC
-        toast.success('Conta criada com sucesso!');
-        try {
-          sessionStorage.setItem('maskpay-app-unlocked', '1');
-        } catch {
-          // ignore
-        }
-        clearSecurityLock();
-        window.localStorage.setItem('maskpay-login-timestamp', Date.now().toString());
-        window.location.href = '/dashboard';
-        return;
+      // registerUser confirms the Auth user; send user to login
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // ignore
       }
+      setPendingConfirmEmail(email.trim());
+      setAwaitingEmailConfirm(true);
+      toast.success('Conta criada! Você já pode fazer login com seu e-mail e senha.');
+      setIsLoading(false);
+      return;
     } catch (err: any) {
       setError(err.message || 'Erro ao processar solicitação');
     } finally {
