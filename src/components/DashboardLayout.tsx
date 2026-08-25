@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { getProfile, type ProfileWithRole } from '@/lib/settings.functions';
 import { NotificationManager } from './NotificationManager';
@@ -28,7 +28,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import maskPlatformAsset from '@/lib/mask-asset';
@@ -43,22 +43,80 @@ export default function DashboardLayout() {
   const location = useLocation();
   const sessionReady = useSessionReady();
   const fetchProfile = useServerFn(getProfile);
+  const queryClient = useQueryClient();
+  const prevVerifiedRef = useRef<boolean | null>(null);
+  const reloadingRef = useRef(false);
 
   const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ['profile'],
     queryFn: () => fetchProfile({}),
     enabled: sessionReady,
-    staleTime: 10_000,
+    staleTime: 5_000,
+    // Poll while waiting for admin approval so unlock happens without logout
+    refetchInterval: (q) => {
+      const p = q.state.data as ProfileWithRole | undefined;
+      if (!p) return 8_000;
+      if (p.role === 'admin' || p.verification_status === 'verified') return 30_000;
+      return 8_000;
+    },
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   }) as { data: ProfileWithRole | undefined; isLoading: boolean };
 
   // Locked by default until profile loads AND admin verified the account.
-  // (Previously: while profile was undefined, canAccess was true → options unlocked on reload)
   const canAccess =
     !!profile &&
     (profile.role === 'admin' || profile.verification_status === 'verified');
   const isKycLocked = !canAccess;
+
+  // Realtime: when admin updates profiles row, refresh + soft reload once on verify
+  useEffect(() => {
+    if (!sessionReady || !profile?.id) return;
+
+    const channel = supabase
+      .channel(`profile-live-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profile.id}`,
+        },
+        async () => {
+          await queryClient.invalidateQueries({ queryKey: ['profile'] });
+          await queryClient.refetchQueries({ queryKey: ['profile'] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionReady, profile?.id, queryClient]);
+
+  // When verification flips to verified, force a full reload so UI/nav unlock without logout
+  useEffect(() => {
+    if (!profile) return;
+    const isVerified =
+      profile.role === 'admin' || profile.verification_status === 'verified';
+
+    if (prevVerifiedRef.current === null) {
+      prevVerifiedRef.current = isVerified;
+      return;
+    }
+
+    if (!prevVerifiedRef.current && isVerified && !reloadingRef.current) {
+      reloadingRef.current = true;
+      queryClient.invalidateQueries().finally(() => {
+        // Soft full reload keeps the session; unlocks menus and refreshes name/data
+        window.location.reload();
+      });
+      return;
+    }
+
+    prevVerifiedRef.current = isVerified;
+  }, [profile, queryClient]);
 
   useEffect(() => {
     setIsMoreOpen(false);

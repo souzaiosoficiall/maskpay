@@ -59,7 +59,13 @@ function DashboardPage() {
     queryKey: ['profile'],
     queryFn: () => fetchProfile({}),
     enabled: sessionReady,
-    staleTime: 10_000,
+    staleTime: 5_000,
+    refetchInterval: (q) => {
+      const p = q.state.data as { role?: string; verification_status?: string } | undefined;
+      if (!p) return 8_000;
+      if (p.role === 'admin' || p.verification_status === 'verified') return 30_000;
+      return 8_000;
+    },
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
@@ -268,7 +274,7 @@ function DashboardPage() {
       <img
         src="/assets/dashboard-banner.png"
         alt="MaskPay — Gateway feito para você vender mais"
-        className="mx-auto block h-auto w-full max-h-[120px] object-contain object-center sm:max-h-[140px]"
+        className="mx-auto block h-auto w-full max-h-[min(28vw,180px)] object-contain object-center sm:max-h-[min(22vw,200px)]"
         loading="eager"
         decoding="async"
       />
@@ -485,13 +491,13 @@ function DashboardPage() {
       <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-white/[0.03] blur-3xl" />
       <div className="pointer-events-none absolute -right-16 top-40 h-72 w-72 rounded-full bg-emerald-500/[0.04] blur-3xl" />
 
-      {/* Banner no topo: imagem inteira, altura limitada para não dominar o dashboard */}
+      {/* Banner responsivo: maior em monitores, imagem inteira sem corte */}
       <div className="relative mb-5">
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_8px_28px_rgba(0,0,0,0.35)] lg:rounded-3xl">
           <img
             src="/assets/dashboard-banner.png"
             alt="MaskPay — Gateway feito para você vender mais"
-            className="mx-auto block h-auto w-full max-h-[160px] object-contain object-center xl:max-h-[180px]"
+            className="mx-auto block h-auto w-full max-h-[min(18vw,220px)] object-contain object-center xl:max-h-[min(16vw,260px)] 2xl:max-h-[min(14vw,300px)]"
             loading="eager"
             decoding="async"
           />
