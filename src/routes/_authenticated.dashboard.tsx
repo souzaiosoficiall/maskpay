@@ -164,6 +164,46 @@ function DashboardPage() {
     return { formatted, isOut };
   };
 
+  const getStatusLabel = (status?: string) => {
+    switch ((status || '').toLowerCase()) {
+      case 'completed':
+      case 'paid':
+      case 'success':
+      case 'approved':
+        return 'REALIZADO';
+      case 'pending':
+        return 'PENDENTE';
+      case 'failed':
+      case 'rejected':
+      case 'error':
+        return 'FALHOU';
+      case 'cancelled':
+        return 'CANCELADO';
+      default:
+        return (status || 'PENDENTE').toUpperCase();
+    }
+  };
+
+  const getStatusBadgeClass = (status?: string) => {
+    switch ((status || '').toLowerCase()) {
+      case 'completed':
+      case 'paid':
+      case 'success':
+      case 'approved':
+        return 'border-green-500/30 bg-green-500/15 text-green-400';
+      case 'pending':
+        return 'border-yellow-500/30 bg-yellow-500/15 text-yellow-400';
+      case 'failed':
+      case 'rejected':
+      case 'error':
+        return 'border-red-500/30 bg-red-500/15 text-red-400';
+      case 'cancelled':
+        return 'border-white/10 bg-white/5 text-muted-foreground';
+      default:
+        return 'border-yellow-500/30 bg-yellow-500/15 text-yellow-400';
+    }
+  };
+
   const typeLabel = (type?: string) => {
     switch (type) {
       case 'deposit':
@@ -270,11 +310,11 @@ function DashboardPage() {
   );
 
   const promoBanner = (
-    <div className="w-full overflow-hidden rounded-2xl border border-white/15 bg-black shadow-[0_8px_28px_rgba(0,0,0,0.45)] sm:rounded-3xl">
+    <div className="w-full overflow-hidden rounded-2xl border border-white/15 bg-black shadow-[0_10px_32px_rgba(0,0,0,0.5)] sm:rounded-3xl">
       <img
         src="/assets/dashboard-banner.png"
         alt="MaskPay — Gateway feito para você vender mais"
-        className="block h-auto w-full scale-[1.02] object-contain object-center brightness-110 contrast-105"
+        className="block h-auto min-h-[7.5rem] w-full scale-[1.06] object-cover object-center brightness-115 contrast-110 sm:min-h-[9rem] sm:scale-[1.04]"
         width={1400}
         height={290}
         loading="eager"
@@ -442,9 +482,16 @@ function DashboardPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-white">{typeLabel(tx.type)}</p>
-                    <p className="text-[10px] font-medium text-muted-foreground">
-                      {formatDate(tx.created_at)}
-                      {tx.status ? ` · ${tx.status}` : ''}
+                    <p className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                      <span>{formatDate(tx.created_at)}</span>
+                      <span
+                        className={cn(
+                          'rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                          getStatusBadgeClass(tx.status),
+                        )}
+                      >
+                        {getStatusLabel(tx.status)}
+                      </span>
                     </p>
                   </div>
                   <p
@@ -705,8 +752,12 @@ function DashboardPage() {
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/20 px-3 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-xs font-bold text-white">
-                      PIX
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
+                      <img
+                        src="/assets/pix-method-icon.png"
+                        alt="PIX"
+                        className="h-5 w-5 object-contain opacity-90"
+                      />
                     </span>
                     <div>
                       <p className="text-sm font-medium text-white">PIX</p>
@@ -784,8 +835,13 @@ function DashboardPage() {
                         <td className="px-4 py-3 font-medium text-white">{typeLabel(tx.type)}</td>
                         <td className="px-4 py-3 text-muted-foreground">{formatDate(tx.created_at)}</td>
                         <td className="px-4 py-3">
-                          <span className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[11px] text-muted-foreground">
-                            {tx.status || '—'}
+                          <span
+                            className={cn(
+                              'rounded-md border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide',
+                              getStatusBadgeClass(tx.status),
+                            )}
+                          >
+                            {getStatusLabel(tx.status)}
                           </span>
                         </td>
                         <td
