@@ -98,21 +98,32 @@ function PayQrPage() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  const [manualKey, setManualKey] = useState('');
+
   const applyPayload = useCallback((text: string) => {
     try {
       const result = parsePixEmv(text);
-      if (!result.pixKey) {
-        toast.error('QR lido, mas não foi possível extrair a chave PIX.');
-        return;
-      }
       stopCamera();
       setParsed(result);
+      setManualKey(result.pixKey || '');
       if (result.amount != null) {
         setAmountOverride(String(result.amount).replace('.', ','));
       } else {
         setAmountOverride('');
       }
-      toast.success('QR Code reconhecido!');
+      if (result.pixKey) {
+        toast.success('QR Code reconhecido!');
+      } else if (result.pixUrl) {
+        toast.message('QR dinâmico detectado', {
+          description: 'Informe a chave PIX do destinatário ou cole o Copia e Cola completo de um QR estático.',
+        });
+      } else if (result.isPix) {
+        toast.message('PIX detectado, chave não embutida', {
+          description: 'Digite a chave PIX do destinatário no campo abaixo.',
+        });
+      } else {
+        toast.error('Não foi possível extrair a chave PIX deste QR.');
+      }
     } catch (err: any) {
       toast.error(err.message || 'QR inválido');
     }
@@ -249,8 +260,9 @@ function PayQrPage() {
   const balance = Number(wallet?.balance || 0);
 
   const openConfirm = () => {
-    if (!parsed?.pixKey) {
-      toast.error('Escaneie ou cole um QR Code PIX válido.');
+    const key = (manualKey || parsed?.pixKey || '').trim();
+    if (!key) {
+      toast.error('Informe a chave PIX do destinatário.');
       return;
     }
     if (payAmount <= 0) {
@@ -266,16 +278,17 @@ function PayQrPage() {
   };
 
   const handlePay = async () => {
-    if (!parsed?.pixKey || txPass.length !== 4) return;
+    const key = (manualKey || parsed?.pixKey || '').trim();
+    if (!key || txPass.length !== 4) return;
     setLoading(true);
     try {
       await doPay({
         data: {
           amount: payAmount,
-          pixKey: parsed.pixKey,
-          pixKeyType: guessPixKeyType(parsed.pixKey),
-          merchantName: parsed.merchantName || undefined,
-          emv: parsed.raw,
+          pixKey: key,
+          pixKeyType: guessPixKeyType(key),
+          merchantName: parsed?.merchantName || undefined,
+          emv: parsed?.raw,
           transactionPassword: txPass,
         },
       });
@@ -406,11 +419,21 @@ function PayQrPage() {
               )}
             </div>
 
-            <div className="space-y-1">
-              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+            <div className="space-y-2">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Chave PIX
-              </p>
-              <p className="text-xs font-bold break-all text-white/80">{parsed.pixKey}</p>
+              </Label>
+              <Input
+                value={manualKey}
+                onChange={(e) => setManualKey(e.target.value)}
+                placeholder="CPF, e-mail, telefone ou chave aleatória"
+                className="bg-white/5 border-white/10 rounded-xl h-12 text-xs font-bold"
+              />
+              {parsed.pixUrl && !parsed.pixKey && (
+                <p className="text-[9px] font-bold text-amber-500/80 uppercase tracking-wider leading-relaxed">
+                  QR dinâmico (sem chave embutida). Confirme ou digite a chave do recebedor.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
