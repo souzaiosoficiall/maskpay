@@ -15,7 +15,6 @@ import { AuthVisualPanel } from '@/components/AuthVisualPanel';
 import { useServerFn } from '@tanstack/react-start';
 import { validateCPFAction } from '@/lib/identity.functions';
 import { syncProfileAfterSignup, checkRegistrationAvailability } from '@/lib/register.functions';
-import { requestPasswordReset } from '@/lib/password-reset.functions';
 
 
 export const Route = createFileRoute('/auth')({
@@ -118,7 +117,6 @@ function AuthPage() {
   const validateCPFServer = useServerFn(validateCPFAction);
   const syncProfileServer = useServerFn(syncProfileAfterSignup);
   const checkAvailabilityServer = useServerFn(checkRegistrationAvailability);
-  const requestResetServer = useServerFn(requestPasswordReset);
   const [isValidatingCPF, setIsValidatingCPF] = useState(false);
   const [isCPFVerified, setIsCPFVerified] = useState(false);
   /** Seconds left before resend confirmation email is allowed (0 = free to resend) */
@@ -230,13 +228,6 @@ function AuthPage() {
           email.trim().toLowerCase(),
           { redirectTo },
         );
-
-        // Also try server branded e-mail (Resend) in parallel — never blocks UX
-        try {
-          void requestResetServer({ data: { email: email.trim().toLowerCase() } });
-        } catch {
-          // ignore
-        }
 
         if (resetErr) {
           console.error('[forgot-password]', resetErr);
@@ -644,11 +635,6 @@ function AuthPage() {
                               email.trim().toLowerCase(),
                               { redirectTo: `${siteOrigin}/auth/reset-password` },
                             );
-                            try {
-                              void requestResetServer({ data: { email: email.trim().toLowerCase() } });
-                            } catch {
-                              // ignore
-                            }
                             if (resetErr) console.error('[forgot-resend]', resetErr);
                             toast.success('Link reenviado. Confira a caixa de entrada e o spam.');
                             setForgotResendCountdown(60);
