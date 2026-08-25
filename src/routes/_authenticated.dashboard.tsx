@@ -258,9 +258,23 @@ function DashboardPage() {
     </>
   );
 
+  const promoBanner = (
+    <div className="w-full overflow-hidden rounded-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] sm:rounded-3xl">
+      <img
+        src="/assets/dashboard-banner.png"
+        alt="MaskPay — Gateway feito para você vender mais"
+        className="block h-auto w-full object-cover object-center"
+        loading="eager"
+        decoding="async"
+      />
+    </div>
+  );
+
   /* ========== MOBILE (unchanged experience) ========== */
   const mobile = (
     <div className="relative z-10 mx-auto w-full max-w-lg space-y-5 pb-4 font-sans lg:hidden">
+      {promoBanner}
+
       <div className="flex items-start justify-between gap-3 pt-1">
         <div>
           <p className="text-[11px] font-medium text-muted-foreground">
@@ -465,6 +479,19 @@ function DashboardPage() {
       {/* soft ambient glow */}
       <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-white/[0.03] blur-3xl" />
       <div className="pointer-events-none absolute -right-16 top-40 h-72 w-72 rounded-full bg-emerald-500/[0.04] blur-3xl" />
+
+      {/* Banner full-width (edge-to-edge within content column) */}
+      <div className="relative -mx-4 mb-5 md:-mx-6 lg:-mx-8">
+        <div className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.4)] lg:rounded-3xl">
+          <img
+            src="/assets/dashboard-banner.png"
+            alt="MaskPay — Gateway feito para você vender mais"
+            className="block h-auto w-full object-cover object-center"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+      </div>
 
       <div className="relative space-y-5">
         {/* Title row */}
