@@ -43,6 +43,9 @@ function PayQrPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
   const detectorRef = useRef<any>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const jsQRRef = useRef<any>(null);
+  const scanningActiveRef = useRef(false);
 
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -78,8 +81,9 @@ function PayQrPage() {
   });
 
   const stopCamera = useCallback(() => {
+    scanningActiveRef.current = false;
     if (scanTimerRef.current) {
-      window.clearInterval(scanTimerRef.current);
+      window.clearTimeout(scanTimerRef.current);
       scanTimerRef.current = null;
     }
     if (streamRef.current) {
@@ -122,6 +126,18 @@ function PayQrPage() {
         throw new Error('Câmera não suportada neste dispositivo.');
       }
 
+      // Load jsQR (works on iOS Safari + Chrome — BarcodeDetector alone is unreliable)
+      if (!jsQRRef.current) {
+        try {
+          const mod = await import('jsqr');
+          jsQRRef.current = mod.default || mod;
+        } catch (e) {
+          console.warn('jsQR import failed, trying CDN', e);
+          const mod = await import(/* @vite-ignore */ 'https://esm.sh/jsqr@1.4.0');
+          jsQRRef.current = (mod as any).default || mod;
+        }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
@@ -133,11 +149,17 @@ function PayQrPage() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.muted = true;
         await videoRef.current.play();
       }
       setScanning(true);
+      scanningActiveRef.current = true;
 
-      // Prefer native BarcodeDetector when available
+      if (!canvasRef.current) {
+        canvasRef.current = document.createElement('canvas');
+      }
+
       const BD = (window as any).BarcodeDetector;
       if (typeof BD === 'function') {
         try {
@@ -147,22 +169,62 @@ function PayQrPage() {
         }
       }
 
-      scanTimerRef.current = window.setInterval(async () => {
+      const tick = async () => {
+        if (!scanningActiveRef.current) return;
         const video = videoRef.current;
-        if (!video || video.readyState < 2) return;
+        const canvas = canvasRef.current;
+        if (!video || !canvas || video.readyState < 2) {
+          scanTimerRef.current = window.setTimeout(tick, 200);
+          return;
+        }
 
         try {
+          // Native detector first (when available)
           if (detectorRef.current) {
-            const codes = await detectorRef.current.detect(video);
-            if (codes?.length) {
-              const raw = codes[0].rawValue || codes[0].rawData;
-              if (raw) applyPayload(String(raw));
+            try {
+              const codes = await detectorRef.current.detect(video);
+              if (codes?.length) {
+                const raw = codes[0].rawValue || codes[0].rawData;
+                if (raw) {
+                  applyPayload(String(raw));
+                  return;
+                }
+              }
+            } catch {
+              // fall through to jsQR
             }
           }
-        } catch {
-          // keep scanning
+
+          // jsQR frame analysis
+          const w = video.videoWidth;
+          const h = video.videoHeight;
+          if (w > 0 && h > 0) {
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, w, h);
+              const imageData = ctx.getImageData(0, 0, w, h);
+              const code = jsQRRef.current(
+                imageData.data,
+                imageData.width,
+                imageData.height,
+                { inversionAttempts: 'attemptBoth' },
+              );
+              if (code?.data) {
+                applyPayload(String(code.data));
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('scan tick error', err);
         }
-      }, 500);
+
+        scanTimerRef.current = window.setTimeout(tick, 250);
+      };
+
+      scanTimerRef.current = window.setTimeout(tick, 300);
     } catch (err: any) {
       console.error(err);
       const msg =
