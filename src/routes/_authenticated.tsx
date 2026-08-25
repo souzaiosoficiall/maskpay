@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { isSecurityLocked, clearAuthStorage } from '@/lib/security-lock';
 import DashboardLayout from '@/components/DashboardLayout';
 import { AppLockScreen, isAppUnlocked, markAppUnlocked } from '@/components/AppLockScreen';
+import { SetupTransactionPinModal } from '@/components/SetupTransactionPinModal';
 
 export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,
@@ -153,5 +154,17 @@ function AuthenticatedLayout() {
     return <AppLockScreen onUnlocked={handleUnlocked} />;
   }
 
-  return <DashboardLayout />;
+  // After account is accepted (verified), force 4-digit PIN setup once
+  const needsPinSetup =
+    !!profile &&
+    profile.role !== 'admin' &&
+    profile.verification_status === 'verified' &&
+    !profile.transaction_password_hash;
+
+  return (
+    <>
+      <DashboardLayout />
+      <SetupTransactionPinModal open={needsPinSetup} />
+    </>
+  );
 }

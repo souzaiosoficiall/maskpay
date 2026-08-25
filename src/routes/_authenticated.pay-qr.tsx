@@ -396,6 +396,8 @@ function PayQrPage() {
     setTxPass('');
     setSetupPass('');
     setSetupPass2('');
+    // Close payment sheet so the PIN dialog is fully visible (not under z-80 overlay)
+    setSheetOpen(false);
     setShowConfirm(true);
   };
 
@@ -689,7 +691,7 @@ function PayQrPage() {
 
       {/* Password confirm */}
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <DialogContent className="bg-card border-white/10 rounded-[2rem] max-w-md">
+        <DialogContent className="bg-card border-white/10 rounded-[2rem] max-w-md z-[220]">
           <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase tracking-tighter">
               Confirmar pagamento
@@ -778,7 +780,10 @@ function PayQrPage() {
             </Button>
             <Button
               variant="ghost"
-              onClick={() => setShowConfirm(false)}
+              onClick={() => {
+                setShowConfirm(false);
+                if (parsed) setSheetOpen(true);
+              }}
               className="text-[10px] font-black uppercase tracking-widest"
             >
               Cancelar
