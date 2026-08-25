@@ -111,10 +111,13 @@ export default function DashboardLayout() {
           
           <div className={cn(
             "overflow-hidden transition-all duration-300 ease-in-out pl-4",
-            isTransferMenuOpen ? "max-h-40 opacity-100 mb-2" : "max-h-0 opacity-0"
+            isTransferMenuOpen ? "max-h-56 opacity-100 mb-2" : "max-h-0 opacity-0"
           )}>
-            {['Saque', 'Depositar', 'Transferência'].map((label, idx) => {
-              const to = idx === 0 ? '/withdraw' : idx === 1 ? '/deposit' : '/transfer';
+            {['Saque', 'Pagar QRcode', 'Depositar', 'Transferência'].map((label, idx) => {
+              const to =
+                idx === 0 ? '/withdraw' :
+                idx === 1 ? '/pay-qr' :
+                idx === 2 ? '/deposit' : '/transfer';
               const isLocked = isKycLocked; // Everything in transfers is locked if KYC is not verified
               return (
                 <Link

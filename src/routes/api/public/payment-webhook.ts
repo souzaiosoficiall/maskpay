@@ -50,7 +50,7 @@ export const Route = createFileRoute('/api/public/payment-webhook')({
             if (providerId) {
               const byProvider = await (supabaseAdmin
                 .from('transactions')
-                .select('id, status, wallet_id, amount, type') as any)
+                .select('id, status, wallet_id, amount, net_amount, fee_amount, type') as any)
                 .eq('provider_id', providerId)
                 .maybeSingle();
               if (byProvider.data) return byProvider.data;
@@ -58,7 +58,7 @@ export const Route = createFileRoute('/api/public/payment-webhook')({
               // Fallback: clientReference may be our internal tx id
               const byId = await (supabaseAdmin
                 .from('transactions')
-                .select('id, status, wallet_id, amount, type') as any)
+                .select('id, status, wallet_id, amount, net_amount, fee_amount, type') as any)
                 .eq('id', providerId)
                 .maybeSingle();
               if (byId.data) return byId.data;
@@ -90,9 +90,18 @@ export const Route = createFileRoute('/api/public/payment-webhook')({
                 .eq('id', (existingTx as any).id);
 
               if ((existingTx as any).type === 'deposit' && (existingTx as any).wallet_id) {
+                // Credit NET amount (after 2.49% + R$ 0,40). Never credit gross amount.
+                const credit =
+                  Number((existingTx as any).net_amount) > 0
+                    ? Number((existingTx as any).net_amount)
+                    : Math.max(
+                        0,
+                        Number((existingTx as any).amount || 0) -
+                          Number((existingTx as any).fee_amount || 0),
+                      );
                 await supabaseAdmin.rpc('adjust_wallet_balance', {
                   p_wallet_id: (existingTx as any).wallet_id,
-                  p_amount: (existingTx as any).amount,
+                  p_amount: credit,
                 });
 
                 try {

@@ -270,3 +270,137 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
       netAmount,
     };
   });
+
+
+/**
+ * Pay a scanned PIX QR Code using wallet balance.
+ * Debits (amount + withdrawal fixed fee). Recipient receives `amount`.
+ * Platform keeps the fixed fee (default R$ 0,80).
+ */
+export const payPixQrCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        amount: z.number().min(0.01, "Valor inválido"),
+        pixKey: z.string().min(1, "Chave PIX não encontrada no QR"),
+        pixKeyType: z.string().optional(),
+        merchantName: z.string().optional(),
+        emv: z.string().optional(),
+        transactionPassword: z.string().length(4),
+      })
+      .parse(data)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: profile } = await (supabase.from("profiles") as any)
+      .select("transaction_password_hash, verification_status, role")
+      .eq("id", userId)
+      .single();
+
+    if ((profile as any)?.transaction_password_hash !== data.transactionPassword) {
+      throw new Error("Senha de transação incorreta.");
+    }
+
+    if (
+      (profile as any)?.role !== "admin" &&
+      (profile as any)?.verification_status !== "verified"
+    ) {
+      throw new Error("Complete a verificação de identidade para pagar via QR Code.");
+    }
+
+    const feesResp = await fetchPlatformFees(supabase);
+    const feeAmount = Number(feesResp.withdrawal?.fixed ?? 0.8);
+    const payAmount = Number(data.amount);
+    const totalDebit = Math.round((payAmount + feeAmount) * 100) / 100;
+
+    const { data: wallet } = await supabase
+      .from("wallets")
+      .select("id, balance")
+      .eq("user_id", userId)
+      .single();
+
+    if (!wallet || Number(wallet.balance || 0) < totalDebit) {
+      throw new Error(
+        `Saldo insuficiente. Necessário ${totalDebit.toFixed(2)} (valor + taxa de R$ ${feeAmount.toFixed(2)}).`
+      );
+    }
+
+    const { data: tx, error: txError } = await (supabase.from("transactions") as any)
+      .insert({
+        wallet_id: wallet.id,
+        amount: totalDebit,
+        fee_amount: feeAmount,
+        net_amount: payAmount,
+        type: "pix_payment",
+        status: "pending",
+        description: `Pagamento PIX QR${data.merchantName ? ` — ${data.merchantName}` : ""}`,
+        metadata: {
+          pix_key: data.pixKey,
+          pix_key_type: data.pixKeyType || "random",
+          merchant_name: data.merchantName || null,
+          emv: data.emv || null,
+          pay_amount: payAmount,
+        },
+      })
+      .select()
+      .single();
+
+    if (txError) throw new Error(txError.message);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.rpc("adjust_wallet_balance", {
+      p_wallet_id: wallet.id,
+      p_amount: -totalDebit,
+    });
+
+    try {
+      const evoData = await callEvoPay("/pix/cash-out", {
+        method: "POST",
+        body: {
+          amount: Number(payAmount.toFixed(2)),
+          pixKey: data.pixKey,
+          pixKeyType: data.pixKeyType || "random",
+          clientReference: String(tx.id),
+          callbackUrl: getWebhookUrl(),
+        },
+      });
+
+      if (evoData) {
+        await (supabase.from("transactions") as any)
+          .update({
+            status: "completed",
+            provider_id: evoData.id || evoData.transactionId || evoData.transaction_id,
+            metadata: { ...((tx as any).metadata || {}), provider_raw: evoData },
+          } as any)
+          .eq("id", tx.id);
+      } else {
+        await (supabase.from("transactions") as any)
+          .update({ status: "completed" } as any)
+          .eq("id", tx.id);
+      }
+    } catch (err: any) {
+      console.error("Pay QR Audit Failure:", err);
+      try {
+        await supabaseAdmin.rpc("adjust_wallet_balance", {
+          p_wallet_id: wallet.id,
+          p_amount: totalDebit,
+        });
+        await (supabase.from("transactions") as any)
+          .update({ status: "failed", metadata: { error: err.message } } as any)
+          .eq("id", tx.id);
+      } catch (refundErr) {
+        console.error("Failed to refund after pay-qr error:", refundErr);
+      }
+      throw new Error(err.message || "Falha ao processar pagamento PIX.");
+    }
+
+    return {
+      success: true,
+      transactionId: tx.id,
+      paid: payAmount,
+      fee: feeAmount,
+      totalDebit,
+    };
+  });

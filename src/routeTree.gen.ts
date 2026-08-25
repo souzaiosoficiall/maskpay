@@ -27,6 +27,7 @@ import { Route as AuthenticatedVerifyRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated.wallet'
 import { Route as AuthenticatedWebhooksRouteImport } from './routes/_authenticated.webhooks'
 import { Route as AuthenticatedWithdrawRouteImport } from './routes/_authenticated.withdraw'
+import { Route as AuthenticatedPayQrRouteImport } from './routes/_authenticated.pay-qr'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as BlogIndexRouteImport } from './routes/blog/index'
@@ -125,6 +126,11 @@ const AuthenticatedWithdrawRoute = AuthenticatedWithdrawRouteImport.update({
   path: '/withdraw',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPayQrRoute = AuthenticatedPayQrRouteImport.update({
+  id: '/pay-qr',
+  path: '/pay-qr',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/wallet': typeof AuthenticatedWalletRoute
   '/webhooks': typeof AuthenticatedWebhooksRoute
   '/withdraw': typeof AuthenticatedWithdrawRoute
+  '/pay-qr': typeof AuthenticatedPayQrRoute
   '/admin/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/wallet': typeof AuthenticatedWalletRoute
   '/webhooks': typeof AuthenticatedWebhooksRoute
   '/withdraw': typeof AuthenticatedWithdrawRoute
+  '/pay-qr': typeof AuthenticatedPayQrRoute
   '/admin/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/wallet': typeof AuthenticatedWalletRoute
   '/_authenticated/webhooks': typeof AuthenticatedWebhooksRoute
   '/_authenticated/withdraw': typeof AuthenticatedWithdrawRoute
+  '/_authenticated/pay-qr': typeof AuthenticatedPayQrRoute
   '/admin/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/webhooks'
     | '/withdraw'
+    | '/pay-qr'
     | '/admin/login'
     | '/legal/privacy'
     | '/legal/terms'
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/webhooks'
     | '/withdraw'
+    | '/pay-qr'
     | '/admin/login'
     | '/legal/privacy'
     | '/legal/terms'
@@ -461,6 +472,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWithdrawRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+  '/_authenticated/pay-qr': {
+      id: '/_authenticated/pay-qr'
+      path: '/pay-qr'
+      fullPath: '/pay-qr'
+      preLoaderRoute: typeof AuthenticatedPayQrRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -528,6 +546,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
   AuthenticatedWebhooksRoute: typeof AuthenticatedWebhooksRoute
   AuthenticatedWithdrawRoute: typeof AuthenticatedWithdrawRoute
+  AuthenticatedPayQrRoute: typeof AuthenticatedPayQrRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -545,6 +564,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedWalletRoute: AuthenticatedWalletRoute,
   AuthenticatedWebhooksRoute: AuthenticatedWebhooksRoute,
   AuthenticatedWithdrawRoute: AuthenticatedWithdrawRoute,
+  AuthenticatedPayQrRoute: AuthenticatedPayQrRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
