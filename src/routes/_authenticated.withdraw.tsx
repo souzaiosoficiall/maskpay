@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Wallet, ArrowRight, Loader2, Lock } from 'lucide-react';
 import { useServerFn } from '@tanstack/react-start';
 import { requestPixWithdrawal, getPlatformFees } from '@/lib/payments.functions';
-import { getProfile } from '@/lib/settings.functions';
+import { getProfile, updateTransactionPassword } from '@/lib/settings.functions';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useSessionReady } from '@/hooks/useSessionReady';
@@ -249,6 +249,10 @@ function WithdrawPage() {
               <div className="pt-4 border-t border-white/5 flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total debitado</span>
                 <span className="text-xl font-black text-white">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalDebit)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Saldo após o saque</span>
+                <span className="text-lg font-black text-white">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.max(0, (wallet?.balance || 0) - totalDebit))}</span>
               </div>
             </div>
 

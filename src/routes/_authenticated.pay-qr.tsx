@@ -30,6 +30,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useSessionReady } from '@/hooks/useSessionReady';
 import { getPlatformFees, payPixQrCode, resolvePixDynamic } from '@/lib/payments.functions';
+import { getProfile, updateTransactionPassword } from '@/lib/settings.functions';
 import { parsePixEmv, guessPixKeyType, type ParsedPixQr } from '@/lib/pix-emv';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +47,8 @@ function PayQrPage() {
   const fetchFees = useServerFn(getPlatformFees);
   const doPay = useServerFn(payPixQrCode);
   const doResolve = useServerFn(resolvePixDynamic);
+  const fetchProfile = useServerFn(getProfile);
+  const doSetTxPass = useServerFn(updateTransactionPassword);
 
   // ---- refs (stable) ----
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -69,6 +72,9 @@ function PayQrPage() {
   const [loading, setLoading] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [amountLocked, setAmountLocked] = useState(false);
+  const [setupPass, setSetupPass] = useState('');
+  const [setupPass2, setSetupPass2] = useState('');
+  const [savingPass, setSavingPass] = useState(false);
 
   const { data: fees } = useQuery({
     queryKey: ['platform-fees'],
@@ -78,6 +84,15 @@ function PayQrPage() {
   });
 
   const feeFixed = Number(fees?.withdrawal?.fixed ?? 0.8);
+
+  const { data: profile, refetch: refetchProfile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: () => fetchProfile({}),
+    enabled: sessionReady,
+    staleTime: 30_000,
+  });
+
+  const hasTxPassword = !!(profile as any)?.transaction_password_hash;
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet-balance-pay-qr'],
@@ -361,13 +376,17 @@ function PayQrPage() {
     setAmountLocked(false);
   };
 
+  const balanceAfter = Math.round((balance - totalDebit) * 100) / 100;
+
   const openConfirm = () => {
     if (!effectiveKey) {
       toast.error('Pix Copia e Cola inválido ou vazio.');
       return;
     }
-    if (payAmount <= 0) {
-      toast.error('Informe o valor do pagamento.');
+    if (payAmount <= 0 || !amountLocked) {
+      toast.error(
+        'Não foi possível obter o valor deste QR Code. Escaneie novamente ou use um código com valor definido.'
+      );
       return;
     }
     if (balance < totalDebit) {
@@ -375,7 +394,33 @@ function PayQrPage() {
       return;
     }
     setTxPass('');
+    setSetupPass('');
+    setSetupPass2('');
     setShowConfirm(true);
+  };
+
+  const handleSaveTxPassword = async () => {
+    if (setupPass.length !== 4 || setupPass2.length !== 4) {
+      toast.error('A senha deve ter 4 dígitos.');
+      return;
+    }
+    if (setupPass !== setupPass2) {
+      toast.error('As senhas não coincidem.');
+      return;
+    }
+    setSavingPass(true);
+    try {
+      await doSetTxPass({
+        data: { newPassword: setupPass, confirmPassword: setupPass2 },
+      });
+      await refetchProfile();
+      toast.success('Senha de transação configurada!');
+      setTxPass(setupPass);
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao salvar senha');
+    } finally {
+      setSavingPass(false);
+    }
   };
 
   const handlePay = async () => {
@@ -585,16 +630,10 @@ function PayQrPage() {
                 </Label>
                 <div className="relative">
                   <Input
-                    value={amountOverride}
-                    onChange={(e) => {
-                      if (amountLocked) return;
-                      setAmountOverride(e.target.value.replace(/[^\d.,]/g, ''));
-                    }}
-                    placeholder="0,00"
-                    inputMode="decimal"
-                    readOnly={amountLocked}
-                    className={`bg-white/5 border-white/10 rounded-xl h-14 text-2xl font-black ${amountLocked ? 'opacity-80 cursor-not-allowed' : ''}`}
-                    disabled={resolving}
+                    value={amountOverride || (resolving ? '' : '—')}
+                    readOnly
+                    placeholder="Aguardando leitura..."
+                    className="bg-white/5 border-white/10 rounded-xl h-14 text-2xl font-black opacity-90 cursor-not-allowed"
                   />
                   {resolving && (
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
@@ -603,11 +642,9 @@ function PayQrPage() {
                     </div>
                   )}
                 </div>
-                {!amountOverride && !resolving && (
-                  <p className="text-[9px] font-bold text-muted-foreground/70 leading-relaxed">
-                    Se o valor não aparecer, informe manualmente (comum em alguns PIX dinâmicos).
-                  </p>
-                )}
+                <p className="text-[9px] font-bold text-muted-foreground/70 leading-relaxed">
+                  Valor bloqueado por segurança — definido pelo QR Code, sem edição.
+                </p>
               </div>
             </div>
 
@@ -629,15 +666,22 @@ function PayQrPage() {
               </p>
               <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 <Wallet className="w-3.5 h-3.5" />
-                Saldo disponível: {formatBRL(balance)}
+                Saldo atual: {formatBRL(balance)}
+              </div>
+              <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest pt-1">
+                <span className="text-muted-foreground">Saldo após pagamento</span>
+                <span className={balanceAfter < 0 ? 'text-red-400' : 'text-white'}>
+                  {formatBRL(Math.max(0, balanceAfter))}
+                </span>
               </div>
             </div>
 
             <Button
               onClick={openConfirm}
-              className="w-full h-14 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-xs"
+              disabled={resolving || payAmount <= 0 || !amountLocked}
+              className="w-full h-14 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-xs disabled:opacity-40"
             >
-              Continuar
+              {resolving ? 'Obtendo valor...' : 'Continuar'}
             </Button>
           </div>
         </div>
@@ -651,34 +695,83 @@ function PayQrPage() {
               Confirmar pagamento
             </DialogTitle>
             <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              {parsed?.merchantName || effectiveKey} · {formatBRL(totalDebit)}
+              {parsed?.merchantName || 'PIX'} · {formatBRL(totalDebit)} · Saldo após:{' '}
+              {formatBRL(Math.max(0, balanceAfter))}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                Senha de transação (4 dígitos)
-              </Label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={4}
-                  value={txPass}
-                  onChange={(e) => setTxPass(e.target.value.replace(/\D/g, ''))}
-                  placeholder="****"
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 pl-12 font-black text-xl tracking-[0.5em] text-center"
-                />
+            {!hasTxPassword ? (
+              <div className="space-y-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                  Configure sua senha de transação
+                </p>
+                <p className="text-[10px] font-bold text-muted-foreground leading-relaxed">
+                  Crie uma senha de 4 dígitos para autorizar saques e pagamentos. Você só precisa
+                  fazer isso uma vez.
+                </p>
+                <div className="space-y-2">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                    Nova senha (4 dígitos)
+                  </Label>
+                  <Input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={setupPass}
+                    onChange={(e) => setSetupPass(e.target.value.replace(/\D/g, ''))}
+                    placeholder="****"
+                    className="bg-white/5 border-white/10 rounded-xl h-12 font-black text-center tracking-[0.4em]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                    Confirmar senha
+                  </Label>
+                  <Input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={setupPass2}
+                    onChange={(e) => setSetupPass2(e.target.value.replace(/\D/g, ''))}
+                    placeholder="****"
+                    className="bg-white/5 border-white/10 rounded-xl h-12 font-black text-center tracking-[0.4em]"
+                  />
+                </div>
+                <Button
+                  onClick={handleSaveTxPassword}
+                  disabled={savingPass || setupPass.length !== 4 || setupPass2.length !== 4}
+                  className="w-full h-12 rounded-xl bg-white text-black font-black uppercase text-[10px] tracking-widest"
+                >
+                  {savingPass ? <Loader2 className="animate-spin" /> : 'Salvar senha'}
+                </Button>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Senha de transação (4 dígitos)
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={txPass}
+                    onChange={(e) => setTxPass(e.target.value.replace(/\D/g, ''))}
+                    placeholder="****"
+                    className="bg-white/5 border-white/10 rounded-2xl h-14 pl-12 font-black text-xl tracking-[0.5em] text-center"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex-col gap-3 sm:flex-col">
             <Button
               onClick={handlePay}
-              disabled={loading || txPass.length !== 4}
+              disabled={loading || !hasTxPassword || txPass.length !== 4}
               className="w-full h-14 rounded-2xl bg-primary text-black font-black uppercase tracking-widest"
             >
               {loading ? <Loader2 className="animate-spin" /> : 'Confirmar pagamento'}

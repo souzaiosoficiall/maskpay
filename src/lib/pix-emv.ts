@@ -190,7 +190,18 @@ export function parsePixEmv(input: string): ParsedPixQr {
   let amount: number | null = null;
   if (amountStr) {
     const n = Number(String(amountStr).replace(",", "."));
-    if (!Number.isNaN(n) && n >= 0) amount = Math.round(n * 100) / 100;
+    if (!Number.isNaN(n) && n > 0) amount = Math.round(n * 100) / 100;
+  }
+
+  // Fallback: scan raw EMV for tag 54 (amount) — handles odd TLV edge cases
+  if (amount == null || amount <= 0) {
+    const m = raw.match(/54(\d{2})(\d+(?:\.\d{1,2})?)/);
+    if (m) {
+      const len = parseInt(m[1], 10);
+      const val = m[2].slice(0, len);
+      const n = Number(val);
+      if (Number.isFinite(n) && n > 0) amount = Math.round(n * 100) / 100;
+    }
   }
 
   return {
@@ -247,10 +258,11 @@ export function extractPixLocationUrl(emv: string): string | null {
 export function extractAmountFromPixPayload(body: any): number | null {
   if (!body) return null;
 
-  // Plain JSON shapes used by several PSPs
+  // Plain JSON shapes used by several PSPs / Open Finance / BACEN
   const candidates = [
     body?.valor?.original,
     body?.valor?.final,
+    body?.valor?.modalidadeAlteracao,
     body?.valor,
     body?.value?.original,
     body?.value,
@@ -258,20 +270,56 @@ export function extractAmountFromPixPayload(body: any): number | null {
     body?.originalAmount,
     body?.calendar?.valor,
     body?.cob?.valor?.original,
+    body?.cob?.valor,
     body?.payload?.valor?.original,
+    body?.payload?.valor,
+    body?.data?.valor?.original,
+    body?.data?.valor,
+    body?.charge?.amount,
+    body?.payment?.amount,
+    body?.txid && body?.valor,
   ];
 
-  for (const c of candidates) {
-    if (c == null) continue;
-    if (typeof c === "object") {
-      const nested = (c as any).original ?? (c as any).final ?? (c as any).amount;
-      const n = Number(String(nested).replace(",", "."));
-      if (Number.isFinite(n) && n > 0) return Math.round(n * 100) / 100;
-    } else {
-      const n = Number(String(c).replace(",", "."));
-      if (Number.isFinite(n) && n > 0) return Math.round(n * 100) / 100;
+  const tryNum = (v: any): number | null => {
+    if (v == null) return null;
+    if (typeof v === "object") {
+      return (
+        tryNum((v as any).original) ??
+        tryNum((v as any).final) ??
+        tryNum((v as any).amount) ??
+        tryNum((v as any).value)
+      );
     }
+    const cleaned = String(v).replace(",", ".").replace(/[^0-9.]/g, "");
+    const num = Number(cleaned);
+    if (Number.isFinite(num) && num > 0 && num < 1e9) return Math.round(num * 100) / 100;
+    return null;
+  };
+
+  for (const c of candidates) {
+    const n = tryNum(c);
+    if (n) return n;
   }
+
+  // Deep walk for keys valor/amount/original
+  const walk = (obj: any, depth = 0): number | null => {
+    if (!obj || depth > 6) return null;
+    if (typeof obj !== "object") return tryNum(obj);
+    for (const [k, v] of Object.entries(obj)) {
+      const key = k.toLowerCase();
+      if (["valor", "amount", "original", "value", "final"].includes(key)) {
+        const n = tryNum(v);
+        if (n) return n;
+      }
+      if (v && typeof v === "object") {
+        const n = walk(v, depth + 1);
+        if (n) return n;
+      }
+    }
+    return null;
+  };
+  const deep = walk(body);
+  if (deep) return deep;
 
   // JWT / JWS compact: header.payload.sig — decode middle part
   if (typeof body === "string" && body.split(".").length >= 2) {
