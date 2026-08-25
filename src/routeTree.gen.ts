@@ -11,8 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AdminLegacyRouteImport } from './routes/admin-legacy'
+import { Route as AdminRouteImport } from './routes/aylla'
+import { Route as AdminDecoyRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthConfirmedRouteImport } from './routes/auth.confirmed'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
@@ -31,8 +31,8 @@ import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedWebhooksRouteImport } from './routes/_authenticated.webhooks'
 import { Route as AuthenticatedWithdrawRouteImport } from './routes/_authenticated.withdraw'
 import { Route as AuthenticatedPayQrRouteImport } from './routes/_authenticated.pay-qr'
-import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as AdminIndexRouteImport } from './routes/aylla.index'
+import { Route as AdminLoginRouteImport } from './routes/aylla.login'
 import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as LegalPrivacyRouteImport } from './routes/legal/privacy'
@@ -53,7 +53,7 @@ const AdminRoute = AdminRouteImport.update({
   path: '/aylla',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminLegacyRoute = AdminLegacyRouteImport.update({
+const AdminDecoyRoute = AdminDecoyRouteImport.update({
   id: '/admin',
   path: '/admin',
   getParentRoute: () => rootRouteImport,
@@ -188,6 +188,7 @@ const ApiPublicPaymentWebhookRoute = ApiPublicPaymentWebhookRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aylla': typeof AdminRouteWithChildren
+  '/admin': typeof AdminDecoyRoute
   '/auth': typeof AuthRoute
   '/auth/confirmed': typeof AuthConfirmedRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
@@ -611,7 +612,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
-  AdminLegacyRoute: AdminLegacyRoute,
+  AdminDecoyRoute: AdminDecoyRoute,
   AuthRoute: AuthRoute,
   AuthConfirmedRoute: AuthConfirmedRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
