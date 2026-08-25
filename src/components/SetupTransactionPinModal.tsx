@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useServerFn } from '@tanstack/react-start';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -18,8 +18,25 @@ export function SetupTransactionPinModal({ open }: { open: boolean }) {
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
   const [saving, setSaving] = useState(false);
+  // Hide immediately after successful save while profile refetch settles
+  const [completed, setCompleted] = useState(false);
 
-  if (!open) return null;
+  // Reset local completion when parent re-opens the modal (e.g. new session)
+  useEffect(() => {
+    if (open) setCompleted(false);
+  }, [open]);
+
+  // Prevent background scroll while the blocking PIN modal is visible
+  useEffect(() => {
+    if (!open || completed) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open, completed]);
+
+  if (!open || completed) return null;
 
   const save = async () => {
     if (pin.length !== 4) {
@@ -33,8 +50,14 @@ export function SetupTransactionPinModal({ open }: { open: boolean }) {
     setSaving(true);
     try {
       await doSet({ data: { newPassword: pin, confirmPassword: pin2 } });
-      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      // Optimistic close + cache update so needsPinSetup becomes false immediately
+      queryClient.setQueryData(['profile'], (old: any) =>
+        old ? { ...old, transaction_password_hash: pin } : old,
+      );
+      setCompleted(true);
       toast.success('PIN de transação criado com sucesso!');
+      // Background refetch to stay in sync with server
+      void queryClient.invalidateQueries({ queryKey: ['profile'] });
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao salvar PIN');
     } finally {

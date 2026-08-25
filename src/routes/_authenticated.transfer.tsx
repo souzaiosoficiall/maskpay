@@ -44,7 +44,7 @@ function TransferPage() {
         .from('wallets')
         .select('id')
         .eq('user_id', profile!.id)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!profile?.id,

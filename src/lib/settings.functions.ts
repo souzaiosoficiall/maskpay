@@ -54,9 +54,11 @@ export const getProfile = createServerFn({ method: "GET" })
     let data: any = null;
     let error: any = null;
     try {
+      const PROFILE_SELECT =
+        'id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at, transaction_password_hash';
       const adminRes = await supabaseAdmin
         .from('profiles')
-        .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
+        .select(PROFILE_SELECT)
         .eq('id', userId)
         .maybeSingle();
       data = adminRes.data;
@@ -67,7 +69,9 @@ export const getProfile = createServerFn({ method: "GET" })
     if (!data) {
       const userRes = await supabase
         .from('profiles')
-        .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
+        .select(
+          'id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at, transaction_password_hash',
+        )
         .eq('id', userId)
         .maybeSingle();
       if (userRes.data) data = userRes.data;
@@ -113,7 +117,9 @@ export const getProfile = createServerFn({ method: "GET" })
             .from('profiles')
             .update(updates)
             .eq('id', userId)
-            .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
+            .select(
+              'id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at, transaction_password_hash',
+            )
             .maybeSingle();
           
           if (updated) data = updated;
@@ -161,7 +167,9 @@ export const getProfile = createServerFn({ method: "GET" })
         status: isOwner ? 'active' : 'active',
         account_route: 'WHITE'
       })
-      .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
+      .select(
+        'id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at, transaction_password_hash',
+      )
       .maybeSingle();
 
     if (createError || !created) {

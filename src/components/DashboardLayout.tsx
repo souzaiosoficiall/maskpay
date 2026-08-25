@@ -53,6 +53,16 @@ export default function DashboardLayout() {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Lock body scroll while mobile drawer is open (prevents background scroll on iOS)
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobileMenuOpen]);
+
   const menuItems = [
     { icon: Webhook, label: 'Movimentações', to: '/transactions' },
     { icon: Receipt, label: 'Taxas', to: '/rates' },

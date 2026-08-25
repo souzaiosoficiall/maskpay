@@ -52,7 +52,7 @@ function WithdrawPage() {
         .from('wallets')
         .select('id, balance')
         .eq('user_id', profile!.id)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!profile?.id,

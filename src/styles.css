@@ -202,3 +202,29 @@ html, body, #root {
 .fixed.z-50[data-state="closed"] {
   transition-duration: 700ms !important;
 }
+
+/* Mobile polish: smoother scrolling, no overscroll bounce on drawers, better taps */
+@media (max-width: 768px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior-y: none;
+  }
+  body {
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Keep main content from horizontal overflow on small screens */
+  main, .max-w-7xl, .max-w-4xl, .max-w-3xl {
+    max-width: 100%;
+  }
+}
+
+/* Prevent iOS zoom on focused inputs is already handled (font-size 16px).
+   Extra: ensure dialogs/modals respect safe areas on notched devices */
+[role="dialog"],
+[data-slot="dialog-content"],
+[data-radix-dialog-content] {
+  max-height: min(90dvh, 100%);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
