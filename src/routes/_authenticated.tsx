@@ -1,24 +1,64 @@
 import { createFileRoute, useNavigate, useLocation } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { getProfile, type ProfileWithRole } from '@/lib/settings.functions';
 import { updateLastAccess } from '@/lib/auth-session.functions';
 import { useSessionReady } from '@/hooks/useSessionReady';
 import { supabase } from '@/integrations/supabase/client';
 import { isSecurityLocked, clearAuthStorage } from '@/lib/security-lock';
 import DashboardLayout from '@/components/DashboardLayout';
-import { AppLockScreen, isAppUnlocked, markAppUnlocked } from '@/components/AppLockScreen';
+import { AppLockScreen, isAppUnlocked, markAppUnlocked, clearAppUnlock } from '@/components/AppLockScreen';
 import { SetupTransactionPinModal } from '@/components/SetupTransactionPinModal';
 
 export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,
 });
 
+/** Full local wipe + redirect to homepage (used when account was deleted by admin). */
+function forceLogoutToHome() {
+  try {
+    clearAuthStorage();
+  } catch {
+    // ignore
+  }
+  try {
+    clearAppUnlock();
+  } catch {
+    // ignore
+  }
+  try {
+    window.localStorage.removeItem('maskpay-login-timestamp');
+    window.localStorage.removeItem('maskpay-webauthn-credential-id');
+  } catch {
+    // ignore
+  }
+  supabase.auth.signOut({ scope: 'local' }).finally(() => {
+    window.location.replace('/');
+  });
+}
+
+function isAccountDeletedError(err: unknown): boolean {
+  const msg = String((err as any)?.message || err || '');
+  return (
+    msg.includes('ACCOUNT_DELETED') ||
+    msg.includes('User from sub claim in JWT does not exist') ||
+    msg.includes('user_not_found') ||
+    /user not found/i.test(msg)
+  );
+}
+
 function AuthenticatedLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const sessionReady = useSessionReady();
+  const loggingOutRef = useRef(false);
+
+  const forceOut = useCallback(() => {
+    if (loggingOutRef.current) return;
+    loggingOutRef.current = true;
+    forceLogoutToHome();
+  }, []);
 
   // DevTools lock: never allow authenticated routes while lock is active
   useEffect(() => {
@@ -70,45 +110,89 @@ function AuthenticatedLayout() {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  const { data: profile, isLoading: isProfileLoading } = useQuery({
-    queryKey: ['profile'],
-    queryFn: () => fetchProfile({}),
-    enabled: sessionReady,
-  }) as { data: ProfileWithRole | undefined; isLoading: boolean };
+  // Must pass server-side auth check before Face ID / dashboard (catches admin-deleted users)
+  const [authValidated, setAuthValidated] = useState(false);
 
+  const {
+    data: profile,
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    error: profileError,
+  } = useQuery({
+    queryKey: ['profile'],
+    // Only fetch profile after we know the Auth user still exists
+    queryFn: () => fetchProfile({}),
+    enabled: sessionReady && authValidated,
+    retry: (failureCount, err) => {
+      // Never retry deleted-account errors
+      if (isAccountDeletedError(err)) return false;
+      return failureCount < 2;
+    },
+  }) as {
+    data: ProfileWithRole | undefined;
+    isLoading: boolean;
+    isError: boolean;
+    error: unknown;
+  };
+
+  // Server-side validation: JWT may still be valid after admin deleteUser.
+  // getUser() hits Auth API and fails when the user no longer exists.
   useEffect(() => {
     if (!sessionReady) return;
 
-    // Confirm session still exists in storage (do not force logout just because profile is slow)
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) return;
+    let cancelled = false;
+    setAuthValidated(false);
+
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (!sessionData.session) {
+        forceOut();
+        return;
+      }
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (cancelled) return;
+
+      if (userError || !userData?.user) {
+        console.log('[AuthenticatedLayout] Auth user missing (deleted?). Forcing logout.');
+        forceOut();
+        return;
+      }
+
       doUpdateLastAccess({}).catch(() => undefined);
 
       const lastAccess = window.localStorage.getItem('maskpay-login-timestamp');
       const now = Date.now();
       const twentyFourHours = 24 * 60 * 60 * 1000;
 
-      // Only expire after 24h WITHOUT opening the app
       if (lastAccess) {
         const elapsed = now - parseInt(lastAccess, 10);
         if (!Number.isNaN(elapsed) && elapsed > twentyFourHours) {
           console.log('[AuthenticatedLayout] Session expired (>24h inactivity).');
-          supabase.auth.signOut().then(() => {
-            window.localStorage.removeItem('maskpay-login-timestamp');
-            try {
-              sessionStorage.removeItem('maskpay-app-unlocked');
-            } catch {
-              // ignore
-            }
-            window.location.href = '/auth?mode=login';
-          });
+          forceOut();
           return;
         }
       }
 
       window.localStorage.setItem('maskpay-login-timestamp', String(now));
-    });
-  }, [sessionReady, location.pathname, doUpdateLastAccess]);
+      if (!cancelled) setAuthValidated(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionReady, location.pathname, doUpdateLastAccess, forceOut]);
+
+  // Profile fetch failed because account was deleted by admin
+  useEffect(() => {
+    if (!sessionReady || isProfileLoading) return;
+    if (isProfileError && isAccountDeletedError(profileError)) {
+      console.log('[AuthenticatedLayout] ACCOUNT_DELETED from getProfile. Forcing logout.');
+      forceOut();
+    }
+  }, [sessionReady, isProfileLoading, isProfileError, profileError, forceOut]);
 
   useEffect(() => {
     if (!sessionReady || isProfileLoading || !profile) return;
@@ -116,9 +200,7 @@ function AuthenticatedLayout() {
     // Se a conta estiver bloqueada ou recusada, força logout e volta para a home
     if (profile.status === 'blocked' || profile.status === 'rejected') {
       console.log(`[AuthenticatedLayout] Account ${profile.status}. Force logout and redirect.`);
-      supabase.auth.signOut().then(() => {
-        window.location.href = '/';
-      });
+      forceOut();
       return;
     }
 
@@ -147,10 +229,24 @@ function AuthenticatedLayout() {
         return;
       }
     }
-  }, [profile, isProfileLoading, sessionReady, location.pathname, navigate]);
+  }, [profile, isProfileLoading, sessionReady, location.pathname, navigate, forceOut]);
 
-  // Show lock screen until Face ID succeeds (only when we know there is a session)
-  if (sessionReady && !unlocked) {
+  // Wait for server-side auth validation (blocks Face ID on deleted accounts)
+  if (sessionReady && !authValidated) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+      </div>
+    );
+  }
+
+  // Profile says account was deleted
+  if (sessionReady && isProfileError && isAccountDeletedError(profileError)) {
+    return null;
+  }
+
+  // Show lock screen until Face ID succeeds (only when we know there is a live session)
+  if (sessionReady && authValidated && !unlocked) {
     return <AppLockScreen onUnlocked={handleUnlocked} />;
   }
 

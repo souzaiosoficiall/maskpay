@@ -273,20 +273,54 @@ export const deleteUser = createServerFn({ method: "POST" })
       .from('profiles')
       .select('email')
       .eq('id', data.userId)
-      .single();
+      .maybeSingle();
 
-    if (profile?.email === OWNER_EMAIL) {
+    if (profile?.email?.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
       throw new Error("Não é possível remover a conta do proprietário.");
     }
 
-    // Auth delete (triggers cascade to profiles and other tables)
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
+    const userId = data.userId as string;
+
+    // Best-effort: invalidate all sessions for this user before deleting
+    try {
+      // @ts-expect-error — available on recent supabase-js admin API
+      await supabaseAdmin.auth.admin.signOut(userId, 'global');
+    } catch {
+      // ignore if API not supported
+    }
+
+    // Explicit cleanup of related rows (in case some FKs are ON DELETE SET NULL / missing cascade)
+    // Order: dependents first, profiles last
+    const byUserId = [
+      'push_subscriptions',
+      'api_keys',
+      'webhooks',
+      'tickets',
+      'user_roles',
+      'verification_requests',
+      'wallets',
+    ] as const;
+    for (const table of byUserId) {
+      try {
+        await (supabaseAdmin.from(table as any) as any).delete().eq('user_id', userId);
+      } catch {
+        // table may not exist in every environment
+      }
+    }
+    try {
+      await supabaseAdmin.from('profiles').delete().eq('id', userId);
+    } catch {
+      // ignore
+    }
+
+    // Auth delete (also cascades to profiles/wallets where ON DELETE CASCADE is set)
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (error) throw new Error(error.message);
 
     await supabaseAdmin.from('admin_logs' as any).insert({
       admin_id: context.userId,
-      target_user_id: data.userId,
+      target_user_id: userId,
       action: `USER_DELETED`,
       details: { email: profile?.email }
     } as any);

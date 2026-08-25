@@ -129,15 +129,28 @@ export const getProfile = createServerFn({ method: "GET" })
 
     if (error) {
        console.error("Profile fetch error:", error);
-       // Do not throw — fall through to admin create / in-memory profile
+       // Do not throw — fall through to admin create path (only if auth user still exists)
        data = null as any;
     }
 
     if (data) {
+      // Profile exists but auth user may have been deleted by admin (orphan edge case)
+      try {
+        const res = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (!res?.data?.user) {
+          // Auth user gone — purge leftover profile and force client logout
+          await supabaseAdmin.from('profiles').delete().eq('id', userId);
+          throw new Error('ACCOUNT_DELETED');
+        }
+      } catch (e: any) {
+        if (e?.message === 'ACCOUNT_DELETED') throw e;
+        // Network/API errors: still allow existing profile through
+        console.error('[getProfile] auth existence check failed:', e);
+      }
       return maskPII({ ...data, role }, role);
     }
 
-    // Profile row doesn't exist yet — create it using admin client to bypass RLS
+    // Profile row doesn't exist — only auto-create if the Auth user still exists
     let authUser: any = null;
     try {
       const res = await supabaseAdmin.auth.admin.getUserById(userId);
@@ -145,6 +158,13 @@ export const getProfile = createServerFn({ method: "GET" })
     } catch (e) {
       console.error('[getProfile] getUserById (create path) failed:', e);
     }
+
+    // User was deleted by admin (or never existed) — do NOT invent an in-memory profile
+    if (!authUser) {
+      console.warn(`[getProfile] Auth user ${userId} not found. Account deleted or invalid.`);
+      throw new Error('ACCOUNT_DELETED');
+    }
+
     const userMetadata = authUser?.user_metadata || {};
     
     // Use the name from metadata (filled during sign up)
@@ -173,23 +193,9 @@ export const getProfile = createServerFn({ method: "GET" })
       .maybeSingle();
 
     if (createError || !created) {
-      // A criação da linha pode ser bloqueada pelas regras de segurança do banco
-      // (falta a policy de INSERT em public.profiles). Nesse caso não derrubamos a
-      // aplicação: devolvemos um perfil temporário em memória.
+      // FK to auth.users fails when the user was deleted — treat as deleted account
       console.error("Profile creation error:", createError);
-      return maskPII({
-        id: userId,
-        email,
-        full_name: fullName,
-        document,
-        phone,
-        status: 'active',
-        verification_status: isOwner ? 'verified' : 'unverified',
-        kyc_status: isOwner ? 'verified' : 'unverified',
-        account_route: 'WHITE',
-        created_at: new Date().toISOString(),
-        role,
-      } as any, role);
+      throw new Error('ACCOUNT_DELETED');
     }
 
     // Ensure the user also has a wallet
