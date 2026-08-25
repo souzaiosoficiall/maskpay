@@ -4,7 +4,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { fetchPlatformFees } from "./platform-fees.server";
 import { calculateDepositAmounts, calculateWithdrawalAmounts } from "./fees-logic";
 import { callEvoPay } from "./evopay-client.server";
-import { parsePixEmv, guessPixKeyType } from "./pix-emv";
+import {
+  parsePixEmv,
+  guessPixKeyType,
+  extractPixLocationUrl,
+  extractAmountFromPixPayload,
+  extractMerchantFromPixPayload,
+  extractKeyFromPixPayload,
+} from "./pix-emv";
 
 /**
  * Builds the public webhook URL for EvoPay callbacks.
@@ -449,5 +456,98 @@ export const payPixQrCode = createServerFn({ method: "POST" })
       paid: payAmount,
       fee: feeAmount,
       totalDebit,
+    };
+  });
+
+
+/**
+ * Resolve dynamic PIX QR location URL to amount / key / merchant.
+ * Runs on the server to avoid browser CORS blocks.
+ */
+export const resolvePixDynamic = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ emv: z.string().min(20) }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const emv = data.emv.replace(/\s/g, "");
+    let amount: number | null = null;
+    let merchantName: string | null = null;
+    let pixKey: string | null = null;
+
+    // 1) Try local EMV parse first
+    try {
+      const local = parsePixEmv(emv);
+      amount = local.amount;
+      merchantName = local.merchantName;
+      pixKey = local.pixKey;
+      if (amount && amount > 0 && pixKey) {
+        return { amount, merchantName, pixKey, source: "emv" as const };
+      }
+    } catch {
+      // continue
+    }
+
+    const url = extractPixLocationUrl(emv);
+    if (!url) {
+      return { amount, merchantName, pixKey, source: "none" as const };
+    }
+
+    // 2) Fetch location (BACEN-style dynamic charge)
+    const headersList = [
+      { Accept: "application/json" },
+      { Accept: "application/jose" },
+      { Accept: "application/jwt" },
+      { Accept: "*/*" },
+    ];
+
+    let bodyText = "";
+    let bodyJson: any = null;
+
+    for (const headers of headersList) {
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            ...headers,
+            "User-Agent": "MaskPay/1.0",
+          },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) continue;
+        bodyText = await res.text();
+        if (!bodyText) continue;
+        try {
+          bodyJson = JSON.parse(bodyText);
+        } catch {
+          bodyJson = bodyText;
+        }
+        break;
+      } catch (err) {
+        console.warn("[resolvePixDynamic] fetch failed", url, err);
+      }
+    }
+
+    if (bodyJson != null) {
+      const a = extractAmountFromPixPayload(bodyJson);
+      const m = extractMerchantFromPixPayload(bodyJson);
+      const k = extractKeyFromPixPayload(bodyJson);
+      if (a) amount = a;
+      if (m) merchantName = m;
+      if (k) pixKey = k;
+    }
+
+    // JWT compact string
+    if ((!amount || amount <= 0) && typeof bodyText === "string" && bodyText.includes(".")) {
+      const a = extractAmountFromPixPayload(bodyText);
+      if (a) amount = a;
+    }
+
+    return {
+      amount,
+      merchantName,
+      pixKey,
+      source: amount || pixKey ? ("location" as const) : ("none" as const),
+      locationUrl: url,
     };
   });

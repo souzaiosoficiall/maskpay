@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useSessionReady } from '@/hooks/useSessionReady';
-import { getPlatformFees, payPixQrCode } from '@/lib/payments.functions';
+import { getPlatformFees, payPixQrCode, resolvePixDynamic } from '@/lib/payments.functions';
 import { parsePixEmv, guessPixKeyType, type ParsedPixQr } from '@/lib/pix-emv';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +45,7 @@ function PayQrPage() {
   const sessionReady = useSessionReady();
   const fetchFees = useServerFn(getPlatformFees);
   const doPay = useServerFn(payPixQrCode);
+  const doResolve = useServerFn(resolvePixDynamic);
 
   // ---- refs (stable) ----
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -66,6 +67,7 @@ function PayQrPage() {
   const [txPass, setTxPass] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resolving, setResolving] = useState(false);
 
   const { data: fees } = useQuery({
     queryKey: ['platform-fees'],
@@ -113,12 +115,12 @@ function PayQrPage() {
 
   /** Called whenever a QR string is decoded — always opens the payment sheet. */
   const applyPayload = useCallback(
-    (text: string) => {
+    async (text: string) => {
       try {
         const result = parsePixEmv(text);
         stopCamera();
         setParsed(result);
-        // Always use full PIX copia-e-cola (EMV) in the receiver field — bank-app behavior
+        // Always use full PIX copia-e-cola (EMV)
         setManualKey(result.raw || text.trim());
         setAmountOverride(
           result.amount != null && result.amount > 0
@@ -127,11 +129,43 @@ function PayQrPage() {
         );
         setSheetOpen(true);
         toast.success('QR Code lido com sucesso');
+
+        // Dynamic PIX: amount is often only at the location URL — resolve on server
+        const needsResolve =
+          !(result.amount && result.amount > 0) || !result.pixKey;
+        if (needsResolve && (result.pixUrl || result.raw?.startsWith('0002'))) {
+          setResolving(true);
+          try {
+            const resolved = await doResolve({ data: { emv: result.raw } });
+            if (resolved?.amount && resolved.amount > 0) {
+              setAmountOverride(String(resolved.amount).replace('.', ','));
+            }
+            if (resolved?.merchantName) {
+              setParsed((prev) =>
+                prev
+                  ? { ...prev, merchantName: resolved.merchantName || prev.merchantName }
+                  : prev
+              );
+            }
+            if (resolved?.pixKey) {
+              setParsed((prev) =>
+                prev ? { ...prev, pixKey: resolved.pixKey || prev.pixKey } : prev
+              );
+            }
+            if (resolved?.amount && resolved.amount > 0) {
+              toast.success(`Valor detectado: R$ ${Number(resolved.amount).toFixed(2).replace('.', ',')}`);
+            }
+          } catch (err) {
+            console.warn('resolvePixDynamic failed', err);
+          } finally {
+            setResolving(false);
+          }
+        }
       } catch (err: any) {
         toast.error(err?.message || 'QR inválido');
       }
     },
-    [stopCamera]
+    [stopCamera, doResolve]
   );
 
   const startCamera = async () => {
@@ -482,13 +516,27 @@ function PayQrPage() {
                 <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Valor a pagar (R$) *
                 </Label>
-                <Input
-                  value={amountOverride}
-                  onChange={(e) => setAmountOverride(e.target.value.replace(/[^\d.,]/g, ''))}
-                  placeholder="0,00"
-                  inputMode="decimal"
-                  className="bg-white/5 border-white/10 rounded-xl h-14 text-2xl font-black"
-                />
+                <div className="relative">
+                  <Input
+                    value={amountOverride}
+                    onChange={(e) => setAmountOverride(e.target.value.replace(/[^\d.,]/g, ''))}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                    className="bg-white/5 border-white/10 rounded-xl h-14 text-2xl font-black"
+                    disabled={resolving}
+                  />
+                  {resolving && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Buscando valor
+                    </div>
+                  )}
+                </div>
+                {!amountOverride && !resolving && (
+                  <p className="text-[9px] font-bold text-muted-foreground/70 leading-relaxed">
+                    Se o valor não aparecer, informe manualmente (comum em alguns PIX dinâmicos).
+                  </p>
+                )}
               </div>
             </div>
 

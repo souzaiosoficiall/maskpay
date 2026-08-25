@@ -216,3 +216,109 @@ export function guessPixKeyType(key: string): string {
     return "phone";
   return "random";
 }
+
+/**
+ * Extract location URL from a dynamic PIX EMV (tag 25 inside MAI 26–51).
+ */
+export function extractPixLocationUrl(emv: string): string | null {
+  try {
+    const parsed = parsePixEmv(emv);
+    if (parsed.pixUrl) return parsed.pixUrl;
+  } catch {
+    // continue with manual scan
+  }
+  const raw = emv.replace(/\s/g, "");
+  // Heuristic: host.../v2/qr/... or /pix/v2/...
+  const m = raw.match(
+    /((?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[a-zA-Z0-9._\-\/]+)?)/i
+  );
+  if (m) {
+    const path = m[1];
+    if (path.includes("pix") || path.includes("qr") || path.includes("cob")) {
+      return path.startsWith("http") ? path : `https://${path}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Try to decode amount from common PIX location JSON / JWT payloads.
+ */
+export function extractAmountFromPixPayload(body: any): number | null {
+  if (!body) return null;
+
+  // Plain JSON shapes used by several PSPs
+  const candidates = [
+    body?.valor?.original,
+    body?.valor?.final,
+    body?.valor,
+    body?.value?.original,
+    body?.value,
+    body?.amount,
+    body?.originalAmount,
+    body?.calendar?.valor,
+    body?.cob?.valor?.original,
+    body?.payload?.valor?.original,
+  ];
+
+  for (const c of candidates) {
+    if (c == null) continue;
+    if (typeof c === "object") {
+      const nested = (c as any).original ?? (c as any).final ?? (c as any).amount;
+      const n = Number(String(nested).replace(",", "."));
+      if (Number.isFinite(n) && n > 0) return Math.round(n * 100) / 100;
+    } else {
+      const n = Number(String(c).replace(",", "."));
+      if (Number.isFinite(n) && n > 0) return Math.round(n * 100) / 100;
+    }
+  }
+
+  // JWT / JWS compact: header.payload.sig — decode middle part
+  if (typeof body === "string" && body.split(".").length >= 2) {
+    try {
+      const mid = body.split(".")[1];
+      const b64 = mid.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+      let jsonStr = "";
+      if (typeof atob !== "undefined") {
+        jsonStr = decodeURIComponent(
+          Array.prototype.map
+            .call(atob(pad), (c: string) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+        );
+      } else {
+        // Node
+        jsonStr = (globalThis as any).Buffer.from(pad, "base64").toString("utf8");
+      }
+      const json = JSON.parse(jsonStr);
+      return extractAmountFromPixPayload(json);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+export function extractMerchantFromPixPayload(body: any): string | null {
+  if (!body || typeof body !== "object") return null;
+  return (
+    body?.recebedor?.nome ||
+    body?.merchantName ||
+    body?.nome ||
+    body?.cob?.recebedor?.nome ||
+    null
+  );
+}
+
+export function extractKeyFromPixPayload(body: any): string | null {
+  if (!body || typeof body !== "object") return null;
+  const k =
+    body?.chave ||
+    body?.pixKey ||
+    body?.key ||
+    body?.cob?.chave ||
+    body?.recebedor?.chave ||
+    null;
+  return k ? String(k) : null;
+}
