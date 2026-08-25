@@ -38,21 +38,19 @@ export const getAdminFinancialStats = createServerFn({ method: "GET" })
     await ensureAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1. Total Volume (All successful deposits)
-    const { data: deposits } = await supabaseAdmin
-      .from('transactions')
-      .select('amount')
-      .eq('type', 'deposit')
-      .in('status', ['completed', 'paid', 'success', 'approved']);
-    
-    const totalVolume = deposits?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+    const [depositsRes, walletsRes] = await Promise.all([
+      supabaseAdmin
+        .from('transactions')
+        .select('amount')
+        .eq('type', 'deposit')
+        .in('status', ['completed', 'paid', 'success', 'approved']),
+      supabaseAdmin.from('wallets').select('balance'),
+    ]);
 
-    // 2. Balance in Custody (Sum of all user wallets)
-    const { data: wallets } = await supabaseAdmin
-      .from('wallets')
-      .select('balance');
-    
-    const balanceInCustody = wallets?.reduce((acc, curr) => acc + Number(curr.balance), 0) || 0;
+    const totalVolume =
+      depositsRes.data?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+    const balanceInCustody =
+      walletsRes.data?.reduce((acc, curr) => acc + Number(curr.balance), 0) || 0;
 
     return {
       totalVolume,

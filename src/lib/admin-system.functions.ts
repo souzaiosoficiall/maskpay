@@ -41,68 +41,91 @@ const ensureAdmin = async (context: any) => {
 
 export const getAllUsers = createServerFn({ method: "GET" })
   .middleware([requireAdminRole])
-
   .handler(async ({ context }: { context: any }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await ensureAdmin(context);
-    
-    const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers();
-    if (authError) {
-      console.error("Erro ao buscar usuários do Auth:", authError);
-      return [];
+
+    // Fonte principal: tabela profiles (não depende de listUsers / service role).
+    // wallets + KYC em paralelo para reduzir latência.
+    const [profilesRes, walletsRes, requestsRes] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select(
+          "id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at",
+        )
+        .order("created_at", { ascending: false }),
+      supabaseAdmin.from("wallets").select("user_id, balance"),
+      supabaseAdmin
+        .from("verification_requests")
+        .select("id, user_id, status, submitted_at, front_path, back_path, selfie_path")
+        .order("submitted_at", { ascending: false }),
+    ]);
+
+    if (profilesRes.error) {
+      console.error("[getAllUsers] profiles:", profilesRes.error);
+      throw new Error(
+        profilesRes.error.message ||
+          "Falha ao carregar usuários. Verifique SUPABASE_SERVICE_ROLE_KEY no Vercel.",
+      );
     }
 
-    const { data: profiles, error: profilesError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, full_name, email, document, phone, status, verification_status, kyc_status, account_route, created_at')
-      .order('created_at', { ascending: false });
-
-    const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
-
-    const data = (authUsers.users || []).map(user => {
-      const p = profilesMap.get(user.id);
-      return {
-        id: user.id,
-        email: p?.email || user.email || 'N/A',
-        full_name: p?.full_name || user.user_metadata?.['full_name'] || user.user_metadata?.['name'] || 'Usuário sem Nome',
-        document: p?.document || user.user_metadata?.['document'] || null,
-        phone: p?.phone || user.user_metadata?.['phone'] || null,
-        status: p?.status || 'active',
-        verification_status: p?.verification_status || 'unverified',
-        kyc_status: p?.kyc_status || 'unverified',
-        account_route: p?.account_route || 'WHITE',
-        created_at: p?.created_at || user.created_at
-      };
-    });
-
-    // Sort by created_at descending
-    data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-    const { data: wallets } = await supabaseAdmin
-      .from('wallets')
-      .select('user_id, balance');
+    const profiles = profilesRes.data || [];
+    if (walletsRes.error) {
+      console.warn("[getAllUsers] wallets:", walletsRes.error.message);
+    }
+    if (requestsRes.error) {
+      console.warn("[getAllUsers] verification_requests:", requestsRes.error.message);
+    }
 
     const balanceByUser = new Map<string, number>(
-      (wallets || []).map((w: any) => [w.user_id, Number(w.balance)])
+      (walletsRes.data || []).map((w: any) => [w.user_id, Number(w.balance)]),
     );
 
-    const { data: requests } = await supabaseAdmin
-      .from('verification_requests')
-      .select('id, user_id, status, submitted_at, front_path, back_path, selfie_path')
-      .order('submitted_at', { ascending: false });
-
     const requestsByUser = new Map<string, any[]>();
-    for (const r of requests || []) {
+    for (const r of requestsRes.data || []) {
       const list = requestsByUser.get(r.user_id) || [];
       list.push(r);
       requestsByUser.set(r.user_id, list);
     }
 
-    return (data || []).map((p: any) => ({
-      ...p,
-      wallets: balanceByUser.has(p.id) ? [{ balance: balanceByUser.get(p.id) }] : [],
-      verification_requests: requestsByUser.get(p.id) || [],
-    })) as any[];
+    // Enriquecimento opcional via Auth Admin API (só se service role estiver ok)
+    const authMeta = new Map<string, { email?: string; full_name?: string; created_at?: string }>();
+    try {
+      const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers({
+        perPage: 1000,
+      });
+      if (!authError && authUsers?.users) {
+        for (const user of authUsers.users) {
+          authMeta.set(user.id, {
+            email: user.email,
+            full_name:
+              (user.user_metadata as any)?.full_name ||
+              (user.user_metadata as any)?.name,
+            created_at: user.created_at,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[getAllUsers] listUsers indisponível (service role?):", e);
+    }
+
+    return profiles.map((p: any) => {
+      const meta = authMeta.get(p.id);
+      return {
+        id: p.id,
+        email: p.email || meta?.email || "N/A",
+        full_name: p.full_name || meta?.full_name || "Usuário sem Nome",
+        document: p.document || null,
+        phone: p.phone || null,
+        status: p.status || "active",
+        verification_status: p.verification_status || "unverified",
+        kyc_status: p.kyc_status || "unverified",
+        account_route: p.account_route || "WHITE",
+        created_at: p.created_at || meta?.created_at,
+        wallets: balanceByUser.has(p.id) ? [{ balance: balanceByUser.get(p.id) }] : [],
+        verification_requests: requestsByUser.get(p.id) || [],
+      };
+    }) as any[];
   });
 
 export const updateUserStatus = createServerFn({ method: "POST" })

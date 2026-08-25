@@ -93,37 +93,47 @@ function AdminPage() {
   const doDeleteUser = useServerFn(deleteUser);
   const fetchFinancialStats = useServerFn(getAdminFinancialStats);
 
-  const { data: users = [], isLoading: isLoadingUsers, refetch: refetchUsers } = useQuery({
+  const { data: users = [], isLoading: isLoadingUsers, isError: isUsersError, error: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ['admin_users'],
-    queryFn: () => fetchUsers({}).catch(() => []),
-    retry: false,
+    queryFn: () => fetchUsers({}),
+    retry: 1,
     enabled: sessionReady,
-    staleTime: 15_000,
-    refetchOnMount: true
+    staleTime: 20_000,
+    refetchOnMount: true,
   });
 
   const { data: tickets = [], isLoading: isLoadingTickets, refetch: refetchTickets } = useQuery({
     queryKey: ['admin_tickets'],
-    queryFn: () => fetchTickets({}).catch(() => []),
-    retry: false,
+    queryFn: () => fetchTickets({}),
+    retry: 1,
     enabled: sessionReady,
-    staleTime: 15_000,
-    refetchOnMount: true
+    staleTime: 20_000,
+    refetchOnMount: true,
   });
 
   const { data: logs = [] } = useQuery({
     queryKey: ['admin_logs'],
-    queryFn: () => fetchLogs({}).catch(() => []),
+    queryFn: () => fetchLogs({}),
     enabled: sessionReady && activeTab === 'logs',
+    staleTime: 20_000,
   });
 
   const { data: financialStats = { totalVolume: 0, balanceInCustody: 0 } } = useQuery({
     queryKey: ['admin_financial_stats'],
     queryFn: () => fetchFinancialStats({}),
     enabled: sessionReady && activeTab === 'dashboard',
-    staleTime: 15_000,
-    refetchOnMount: true
+    staleTime: 20_000,
+    refetchOnMount: true,
   });
+
+  useEffect(() => {
+    if (isUsersError && usersError) {
+      toast.error(
+        (usersError as Error)?.message ||
+          'Falha ao carregar usuários. Confira SUPABASE_SERVICE_ROLE_KEY no Vercel.',
+      );
+    }
+  }, [isUsersError, usersError]);
 
   const hasOpenTickets = useMemo(() =>
     tickets.some((t: any) => t.status === 'Aberto'),
