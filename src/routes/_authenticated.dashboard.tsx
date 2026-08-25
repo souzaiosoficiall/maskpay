@@ -11,8 +11,6 @@ import {
   ArrowRightLeft,
   Eye,
   EyeOff,
-  Sun,
-  Moon,
   Fingerprint,
   AlertCircle,
   Clock,
@@ -32,7 +30,7 @@ import { Button } from '@/components/ui/button';
 import { useMemo, useState } from 'react';
 import { getTransactionStats, getTransactions } from '@/lib/transactions.functions';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/hooks/useTheme';
+import { ThemeMenu } from '@/components/ThemeMenu';
 import {
   BarChart,
   Bar,
@@ -105,7 +103,6 @@ function DashboardPage() {
 
   const [hideValues, setHideValues] = useState(false);
   const [activePeriod, setActivePeriod] = useState('Mês');
-  const { toggleTheme, isLight } = useTheme();
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -275,15 +272,7 @@ function DashboardPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            title={isLight ? 'Tema escuro' : 'Tema claro'}
-            className="h-10 w-10 rounded-full border border-white/10 bg-white/5 text-muted-foreground hover:text-white"
-          >
-            {isLight ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          </Button>
+          <ThemeMenu variant="icon" />
           <Button
             variant="ghost"
             size="icon"
@@ -507,14 +496,7 @@ function DashboardPage() {
                 </button>
               ))}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="h-9 w-9 rounded-xl border border-white/[0.08] bg-white/[0.03] text-muted-foreground hover:text-white"
-            >
-              {isLight ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </Button>
+            <ThemeMenu variant="button" />
             <Button
               variant="ghost"
               size="icon"
