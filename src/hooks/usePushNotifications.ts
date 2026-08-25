@@ -6,6 +6,7 @@ import {
   getExistingPushSubscription,
   getNotificationPermission,
   getPushSupport,
+  isIOS,
   isStandalonePWA,
   requestNotificationPermission,
   subscribeToPush,
@@ -57,9 +58,11 @@ export function usePushNotifications(enabled: boolean): PushNotificationsState {
         const standalone = isStandalonePWA();
         setIsStandalone(standalone);
 
-        if (!standalone) {
+        // iOS only delivers Web Push inside an installed PWA.
+        // Desktop Chrome / Edge / Firefox work in a normal HTTPS tab.
+        if (!standalone && isIOS()) {
           setState("pwa_not_installed");
-          setReason("Adicione a MaskPay à Tela de Início para ativar as notificações push.");
+          setReason("No iPhone/iPad, adicione a MaskPay à Tela de Início para ativar as notificações.");
           return;
         }
 
@@ -67,7 +70,9 @@ export function usePushNotifications(enabled: boolean): PushNotificationsState {
         if (!support.supported) {
           setState("unsupported");
           setReason(
-            "Este dispositivo/navegador não suporta notificações push (é necessário iOS 16.4+ com o app na Tela de Início).",
+            isIOS()
+              ? "Este dispositivo não suporta notificações push (iOS 16.4+ com o app na Tela de Início)."
+              : "Este navegador não suporta notificações push. Use Chrome, Edge ou Firefox em HTTPS.",
           );
           return;
         }

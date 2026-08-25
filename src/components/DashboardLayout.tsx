@@ -98,16 +98,16 @@ export default function DashboardLayout() {
 
   /** Desktop sidebar (kept for large screens) */
   const DesktopNav = () => (
-    <aside className="hidden lg:flex w-64 flex-col border-r border-white/5 bg-card shrink-0">
+    <aside className="hidden lg:flex w-[240px] flex-col border-r border-white/[0.06] bg-[#0c1015] shrink-0">
       <div className="flex h-16 items-center gap-3 border-b border-white/5 px-6">
         <img src={maskPlatformAsset.url} alt="" className="h-8 w-8 object-contain" />
-        <span className="text-lg font-black uppercase tracking-tighter">MaskPay</span>
+        <span className="text-base font-semibold tracking-tight text-white">MaskPay</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3 custom-scrollbar">
         <Link
           to="/dashboard"
           className={cn(
-            'flex items-center gap-3 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest transition-all',
+            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
             isActive('/dashboard')
               ? 'border border-white/10 bg-white/5 text-white'
               : 'text-muted-foreground hover:bg-white/5 hover:text-white',
@@ -167,7 +167,7 @@ export default function DashboardLayout() {
             key={item.to}
             to={item.to as any}
             className={cn(
-              'flex items-center gap-3 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest transition-all',
+              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
               isActive(item.to)
                 ? 'border border-white/10 bg-white/5 text-white'
                 : 'text-muted-foreground hover:bg-white/5 hover:text-white',
@@ -196,7 +196,7 @@ export default function DashboardLayout() {
   );
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-background text-foreground selection:bg-white/10">
+    <div className="flex h-[100dvh] overflow-hidden bg-[#0a0e13] text-foreground selection:bg-white/10">
       <DesktopNav />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
@@ -223,7 +223,7 @@ export default function DashboardLayout() {
         </header>
 
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6"
+          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 lg:px-6 lg:pt-6"
         >
           <PwaPrompt />
           <PushNotificationManager />

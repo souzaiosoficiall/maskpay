@@ -445,30 +445,73 @@ function DashboardPage() {
     </div>
   );
 
-  /* ========== DESKTOP (PC overview — reference style) ========== */
+  /* ========== DESKTOP — painel profissional (fintech) ========== */
   const maxBar = Math.max(...chartData.map((d: any) => Number(d.value) || 0), 1);
+  const todayLabel = new Date().toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const fullName = profile?.full_name || firstName || 'usuário';
+
+  const kpiCards = [
+    {
+      label: 'Saldo disponível',
+      value: hideValues ? '••••••' : balanceStr,
+      hint: hideValues
+        ? '••••'
+        : `${(txStats?.totalFees ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} taxas`,
+      hintTone: 'text-muted-foreground',
+      icon: Wallet,
+    },
+    {
+      label: 'Volume transacionado',
+      value: hideValues
+        ? '••••'
+        : (txStats?.dailyVolume || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      hint: 'no período selecionado',
+      hintTone: 'text-muted-foreground',
+      icon: Activity,
+    },
+    {
+      label: 'Total retirado',
+      value: hideValues
+        ? '••••'
+        : (txStats?.totalWithdrawn || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      hint: 'saques concluídos',
+      hintTone: 'text-muted-foreground',
+      icon: ArrowUpFromLine,
+    },
+    {
+      label: 'Total de transações',
+      value: String(txStats?.totalTransactions || 0),
+      hint: 'movimentações registradas',
+      hintTone: 'text-muted-foreground',
+      icon: CreditCard,
+    },
+  ];
 
   const desktop = (
     <div className="relative z-10 hidden w-full space-y-6 font-sans lg:block">
-      {/* Top bar */}
-      <div className="flex items-center justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">
-            {greeting}
-            {firstName ? `, ${firstName}` : ''}
+          <h1 className="text-[1.65rem] font-semibold tracking-tight text-white">
+            {greeting}, {fullName}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Aqui está um resumo da sua conta.
           </p>
-          <h1 className="text-2xl font-black tracking-tight text-white">Visão geral</h1>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-muted-foreground xl:flex">
-            <Activity className="h-4 w-4 opacity-50" />
-            Painel financeiro MaskPay
+          <div className="flex items-center rounded-lg border border-white/10 bg-[#12161c] px-3 py-1.5 text-xs text-muted-foreground">
+            Hoje
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
-            className="h-10 w-10 rounded-full border border-white/10 bg-white/5 text-muted-foreground hover:text-white"
+            className="h-9 w-9 rounded-lg border border-white/10 bg-[#12161c] text-muted-foreground hover:text-white"
           >
             {isLight ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </Button>
@@ -476,14 +519,14 @@ function DashboardPage() {
             variant="ghost"
             size="icon"
             onClick={() => setHideValues(!hideValues)}
-            className="h-10 w-10 rounded-full border border-white/10 bg-white/5 text-muted-foreground hover:text-white"
+            className="h-9 w-9 rounded-lg border border-white/10 bg-[#12161c] text-muted-foreground hover:text-white"
           >
             {hideValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
           <Button
             disabled={!canAccess}
             onClick={() => navigate({ to: '/deposit' })}
-            className="h-10 rounded-full bg-white px-5 text-xs font-black uppercase tracking-widest text-black hover:bg-white/90 disabled:opacity-40"
+            className="h-9 rounded-lg bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-40"
           >
             Depositar
           </Button>
@@ -492,271 +535,194 @@ function DashboardPage() {
 
       {kycBanners}
 
-      <div className="grid grid-cols-12 gap-5">
-        {/* Main column */}
-        <div className="col-span-12 space-y-5 xl:col-span-8">
-          {/* Overview stats */}
-          <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-5">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-white">Overview</h2>
-              <span className="rounded-full border border-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Conta ativa
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-white/8 bg-black/20 p-5">
-                <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-                  <Wallet className="h-4 w-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">Saldo</span>
-                </div>
-                <p className="text-3xl font-black tracking-tight text-white">
-                  {hideValues ? '••••••' : balanceStr}
-                </p>
-                <p className="mt-2 flex items-center gap-1 text-xs text-emerald-400">
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  Disponível para saque e transferência
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/8 bg-black/20 p-5">
-                <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-                  <CreditCard className="h-4 w-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">Ticket médio</span>
-                </div>
-                <p className="text-3xl font-black tracking-tight text-white">
-                  {hideValues
-                    ? '••••'
-                    : (txStats?.averageTicket || 0).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {txStats?.totalTransactions || 0} transações · volume do dia{' '}
-                  {hideValues
-                    ? '••••'
-                    : (txStats?.dailyVolume || 0).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                </p>
+      {/* KPI row */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {kpiCards.map((kpi) => (
+          <div
+            key={kpi.label}
+            className="rounded-xl border border-white/[0.06] bg-[#12161c] p-4 shadow-sm"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[13px] font-medium text-muted-foreground">{kpi.label}</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-muted-foreground">
+                <kpi.icon className="h-4 w-4" />
               </div>
             </div>
-
-            {/* Quick actions row */}
-            <div className="mt-5 grid grid-cols-4 gap-3">
-              {quickActions.map((action) => {
-                const locked = action.lock && !canAccess;
-                return (
-                  <button
-                    key={action.label}
-                    type="button"
-                    disabled={locked}
-                    onClick={() => !locked && navigate({ to: action.to as any })}
-                    className={cn(
-                      'flex items-center justify-center gap-2 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-white/[0.06]',
-                      locked && 'opacity-40',
-                    )}
-                  >
-                    <action.icon className="h-4 w-4" />
-                    {action.label}
-                  </button>
-                );
-              })}
-            </div>
+            <p className="text-2xl font-semibold tracking-tight text-white tabular-nums">
+              {kpi.value}
+            </p>
+            <p className={cn('mt-1.5 text-xs', kpi.hintTone)}>{kpi.hint}</p>
           </div>
+        ))}
+      </div>
 
-          {/* Chart */}
-          <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-5">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-                  Fluxo de receita
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">Desempenho das entradas</p>
-              </div>
-              <div className="flex gap-1 rounded-full border border-white/10 bg-black/20 p-1">
-                {['Semana', 'Mês', 'Ano'].map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setActivePeriod(p)}
-                    className={cn(
-                      'rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-wider transition-colors',
-                      activePeriod === p
-                        ? 'bg-white text-black'
-                        : 'text-muted-foreground hover:text-white',
-                    )}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
+      {/* Chart + methods */}
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-12 rounded-xl border border-white/[0.06] bg-[#12161c] p-5 xl:col-span-8">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Receita de {todayLabel}</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Entradas no período</p>
             </div>
-
-            <div className="mb-2 text-3xl font-black tracking-tight text-white">
-              {hideValues
-                ? '••••••'
-                : (txStats?.dailyVolume || 0).toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                  })}
-              <span className="ml-2 text-sm font-semibold text-muted-foreground">hoje</span>
-            </div>
-
-            <div className="h-[280px] w-full">
-              {chartData.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground/40">
-                  Sem dados de gráfico ainda
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="4 4" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 600 }}
-                    />
-                    <YAxis hide />
-                    <Tooltip
-                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                      contentStyle={{
-                        background: '#111',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: 12,
-                        fontSize: 12,
-                      }}
-                    />
-                    <Bar dataKey="value" radius={[8, 8, 8, 8]} maxBarSize={42}>
-                      {chartData.map((entry: any, index: number) => {
-                        const v = Number(entry.value) || 0;
-                        const isPeak = v === maxBar && v > 0;
-                        return (
-                          <Cell key={`cell-${index}`} fill={isPeak ? '#22c55e' : 'rgba(255,255,255,0.12)'} />
-                        );
-                      })}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right column */}
-        <div className="col-span-12 space-y-5 xl:col-span-4">
-          {/* Distribution */}
-          <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-5">
-            <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-white">
-              Distribuição
-            </h2>
-            <div className="mx-auto mb-5 flex h-40 w-40 items-center justify-center">
-              <div
-                className="relative flex h-full w-full items-center justify-center rounded-full"
-                style={{
-                  background: `conic-gradient(
-                    #22c55e 0% ${typeBreakdown[0]?.pct || 0}%,
-                    #ef4444 ${typeBreakdown[0]?.pct || 0}% ${(typeBreakdown[0]?.pct || 0) + (typeBreakdown[1]?.pct || 0)}%,
-                    #3b82f6 ${(typeBreakdown[0]?.pct || 0) + (typeBreakdown[1]?.pct || 0)}% ${(typeBreakdown[0]?.pct || 0) + (typeBreakdown[1]?.pct || 0) + (typeBreakdown[2]?.pct || 0)}%,
-                    #a855f7 ${(typeBreakdown[0]?.pct || 0) + (typeBreakdown[1]?.pct || 0) + (typeBreakdown[2]?.pct || 0)}% 100%
-                  )`,
-                }}
-              >
-                <div className="flex h-[70%] w-[70%] flex-col items-center justify-center rounded-full bg-[#0c0c0c] text-center">
-                  <span className="text-xl font-black text-white">
-                    {txStats?.totalTransactions || 0}
-                  </span>
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Total
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              {typeBreakdown.map((row) => (
-                <div key={row.key} className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: row.color }}
-                    />
-                    {row.label}
-                  </span>
-                  <span className="font-bold text-white">
-                    {row.count} · {row.pct}%
-                  </span>
-                </div>
+            <div className="flex gap-1 rounded-lg border border-white/10 bg-black/30 p-0.5">
+              {['Semana', 'Mês', 'Ano'].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setActivePeriod(p)}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    activePeriod === p
+                      ? 'bg-white text-black'
+                      : 'text-muted-foreground hover:text-white',
+                  )}
+                >
+                  {p}
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Recent list */}
-          <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-                Recentes
-              </h2>
-              <button
-                type="button"
-                onClick={() => canAccess && navigate({ to: '/transactions' })}
-                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-white"
-              >
-                Ver todas
-              </button>
-            </div>
-            <div className="space-y-1">
-              {isLoadingTx && (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/30" />
-                </div>
-              )}
-              {!isLoadingTx && recentDesktop.length === 0 && (
-                <p className="py-6 text-center text-xs text-muted-foreground/50">
-                  Nenhuma movimentação
-                </p>
-              )}
-              {recentDesktop.map((tx: any, i: number) => {
-                const { formatted, isOut } = formatAmount(tx.amount, tx.type);
-                return (
-                  <div
-                    key={tx.id || i}
-                    className="flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-white/[0.03]"
-                  >
-                    <div
-                      className={cn(
-                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-                        isOut ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400',
-                      )}
-                    >
-                      {isOut ? (
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      ) : (
-                        <ArrowDownLeft className="h-3.5 w-3.5" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-white">
-                        {typeLabel(tx.type)}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">{formatDate(tx.created_at)}</p>
-                    </div>
-                    <p
-                      className={cn(
-                        'text-xs font-bold',
-                        isOut ? 'text-red-400' : 'text-emerald-400',
-                      )}
-                    >
-                      {hideValues ? '••••' : `${isOut ? '-' : '+'}${formatted}`}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="h-[260px] w-full">
+            {chartData.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground/50">
+                Sem dados de gráfico ainda
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }}
+                  />
+                  <YAxis hide />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                    contentStyle={{
+                      background: '#0f1419',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 10,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={36}>
+                    {chartData.map((entry: any, index: number) => {
+                      const v = Number(entry.value) || 0;
+                      const isPeak = v === maxBar && v > 0;
+                      return (
+                        <Cell key={`cell-${index}`} fill={isPeak ? '#3b82f6' : 'rgba(59,130,246,0.25)'} />
+                      );
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
+
+        <div className="col-span-12 rounded-xl border border-white/[0.06] bg-[#12161c] p-5 xl:col-span-4">
+          <h2 className="mb-4 text-sm font-semibold text-white">Métodos de pagamento</h2>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-lg border border-white/[0.05] bg-black/20 px-3 py-3">
+              <div className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-sky-400" />
+                <span className="text-sm text-white">PIX</span>
+              </div>
+              <span className="text-sm font-medium tabular-nums text-muted-foreground">
+                {typeBreakdown.find((r) => r.key === 'pix' || r.label?.toLowerCase?.().includes('pix'))?.pct ??
+                  (txStats?.totalTransactions ? 100 : 0)}
+                %
+              </span>
+            </div>
+            {quickActions.map((action) => {
+              const locked = action.lock && !canAccess;
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => !locked && navigate({ to: action.to as any })}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg border border-white/[0.05] bg-black/20 px-3 py-2.5 text-left text-sm text-white transition-colors hover:bg-white/[0.04]',
+                    locked && 'opacity-40',
+                  )}
+                >
+                  <action.icon className="h-4 w-4 text-muted-foreground" />
+                  {action.label}
+                  {locked && <Lock className="ml-auto h-3.5 w-3.5 text-muted-foreground" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Last transactions */}
+      <div className="rounded-xl border border-white/[0.06] bg-[#12161c] p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">Últimas 10 transações</h2>
+          <button
+            type="button"
+            onClick={() => canAccess && navigate({ to: '/transactions' })}
+            className="text-xs font-medium text-muted-foreground hover:text-white"
+          >
+            Ver todas
+          </button>
+        </div>
+        {isLoadingTx && (
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/30" />
+          </div>
+        )}
+        {!isLoadingTx && recentDesktop.length === 0 && (
+          <p className="py-10 text-center text-sm text-muted-foreground/60">
+            Nenhuma transação encontrada.
+          </p>
+        )}
+        {!isLoadingTx && recentDesktop.length > 0 && (
+          <div className="overflow-hidden rounded-lg border border-white/[0.05]">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">Tipo</th>
+                  <th className="px-4 py-2.5 font-medium">Data</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentDesktop.map((tx: any, i: number) => {
+                  const { formatted, isOut } = formatAmount(tx.amount, tx.type);
+                  return (
+                    <tr
+                      key={tx.id || i}
+                      className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]"
+                    >
+                      <td className="px-4 py-3 font-medium text-white">{typeLabel(tx.type)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatDate(tx.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-md bg-white/[0.04] px-2 py-0.5 text-xs text-muted-foreground">
+                          {tx.status || '—'}
+                        </span>
+                      </td>
+                      <td
+                        className={cn(
+                          'px-4 py-3 text-right font-semibold tabular-nums',
+                          isOut ? 'text-red-400' : 'text-emerald-400',
+                        )}
+                      >
+                        {hideValues ? '••••' : `${isOut ? '-' : '+'}${formatted}`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
