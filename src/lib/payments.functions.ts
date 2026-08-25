@@ -72,7 +72,9 @@ function extractPixCodes(evoData: any): {
 export const getPlatformFees = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    return await fetchPlatformFees(context.supabase);
+    const { supabase, userId } = context;
+    const route = await getUserPaymentRoute(supabase, userId);
+    return await fetchPlatformFees(supabase, route);
   });
 
 /**
@@ -92,14 +94,9 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const feesResp = await fetchPlatformFees(supabase, await getUserPaymentRoute(supabase, userId));
+    const paymentRoute = await getUserPaymentRoute(supabase, userId);
+    const feesResp = await fetchPlatformFees(supabase, paymentRoute);
     const { feeAmount, netAmount } = calculateDepositAmounts(data.amount, feesResp.deposit);
-
-    const EVOPAY_API_TOKEN = process.env["EVOPAY_API_TOKEN"];
-    if (!EVOPAY_API_TOKEN) {
-      console.error("ERRO: EVOPAY_API_TOKEN não configurado. Pagamentos reais desativados.");
-      throw new Error("Sistema de pagamentos em manutenção. Por favor, tente novamente mais tarde.");
-    }
 
     try {
       const { data: wallet } = await supabase
@@ -117,7 +114,7 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
           type: "deposit",
           status: "pending",
           description: "Depósito Pix",
-          metadata: {},
+          metadata: { account_route: paymentRoute, fee_route: feesResp.route },
         })
         .select()
         .single();
@@ -125,7 +122,6 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
       if (txError) throw new Error(txError.message);
 
       // Official EvoPay payload (camelCase) — docs.partners.evopay.cash
-      const paymentRoute = await getUserPaymentRoute(supabase, userId);
       const evoData = await callEvoPay("/pix/", { route: paymentRoute, 
         method: "POST",
         body: {
@@ -233,7 +229,13 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
         type: "withdrawal",
         status: "pending",
         description: `Saque Pix para chave ${data.pixKey}`,
-        metadata: { pix_key: data.pixKey, pix_type: data.pixKeyType, payout: payoutAmount },
+        metadata: {
+          pix_key: data.pixKey,
+          pix_type: data.pixKeyType,
+          payout: payoutAmount,
+          account_route: feesResp.route,
+          fee_route: feesResp.route,
+        },
       })
       .select()
       .single();

@@ -146,7 +146,18 @@ function AdminPage() {
   });
 
   // Mutations
-  const updateUserStatusMutation = useMutation({
+  const updateRouteMutation = useMutation({
+    mutationFn: (data: { userId: string; route: 'WHITE' | 'BLACK' }) => doUpdateRoute({ data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
+      toast.success('Rota da conta atualizada! As taxas e o adquirente passam a valer na próxima transação.');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || 'Falha ao atualizar a rota da conta.');
+    },
+  });
+
+    const updateUserStatusMutation = useMutation({
     mutationFn: (data: any) => doUpdateUserStatus({ data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
@@ -314,12 +325,8 @@ function AdminPage() {
           isLoading={isLoadingUsers}
           onUpdateStatus={(data) => updateUserStatusMutation.mutate(data)}
           onUpdateBalance={(data) => updateBalanceMutation.mutate(data)}
-          onUpdateRoute={(data) => {
-            return doUpdateRoute({ data }).then(() => {
-              queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-              toast.success('Rota da conta atualizada!');
-            });
-          }}
+          onUpdateRoute={(data) => updateRouteMutation.mutateAsync(data)}
+          isUpdatingRoute={updateRouteMutation.isPending}
           onResetPassword={(userId) => resetPasswordMutation.mutate(userId)}
           onDeleteUser={(userId) => deleteUserMutation.mutate(userId)}
         />

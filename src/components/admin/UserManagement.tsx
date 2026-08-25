@@ -23,9 +23,10 @@ interface UserManagementProps {
   isLoading: boolean;
   onUpdateStatus: (data: { userId: string, status: 'active' | 'blocked' | 'rejected' }) => void;
   onUpdateBalance: (data: { userId: string, amount: number, type: 'add' | 'set', description: string }) => void;
-  onUpdateRoute: (data: { userId: string, route: 'BLACK' | 'WHITE' }) => void;
+  onUpdateRoute: (data: { userId: string, route: 'BLACK' | 'WHITE' }) => void | Promise<unknown>;
   onResetPassword: (userId: string) => void;
   onDeleteUser: (userId: string) => void;
+  isUpdatingRoute?: boolean;
 }
 
 export function UserManagement({ 
@@ -35,11 +36,13 @@ export function UserManagement({
   onUpdateBalance, 
   onUpdateRoute, 
   onResetPassword,
-  onDeleteUser 
+  onDeleteUser,
+  isUpdatingRoute = false,
 }: UserManagementProps) {
   const [searchUser, setSearchUser] = useState('');
   const [userFilter, setUserFilter] = useState<'all' | 'pending' | 'active' | 'blocked'>('all');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [routeBusy, setRouteBusy] = useState(false);
 
   const selectedUser = users.find((u: any) => u.id === selectedUserId);
 
@@ -212,12 +215,17 @@ export function UserManagement({
                     <Button 
                       size="sm"
                       variant="outline"
+                      disabled={routeBusy || isUpdatingRoute}
                       onClick={async () => {
-                        const newRoute = selectedUser.account_route === 'BLACK' ? 'WHITE' : 'BLACK';
+                        const current = (selectedUser.account_route || 'WHITE') as 'WHITE' | 'BLACK';
+                        const newRoute = current === 'BLACK' ? 'WHITE' : 'BLACK';
+                        setRouteBusy(true);
                         try {
                           await onUpdateRoute({ userId: selectedUser.id, route: newRoute });
                         } catch (err) {
                           console.error("Erro ao atualizar rota:", err);
+                        } finally {
+                          setRouteBusy(false);
                         }
                       }}
                       className={cn(
@@ -225,7 +233,10 @@ export function UserManagement({
                         selectedUser.account_route === 'BLACK' ? "text-primary border-primary/20" : "text-white"
                       )}
                     >
-                      Rota: {selectedUser.account_route || 'WHITE'}
+                      {(routeBusy || isUpdatingRoute) ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                      ) : null}
+                      Rota: {selectedUser.account_route || 'WHITE'} (trocar)
                     </Button>
                     <Button 
                       size="sm"
