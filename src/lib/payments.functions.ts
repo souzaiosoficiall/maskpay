@@ -203,25 +203,30 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .single();
 
-    if (!wallet || (wallet.balance || 0) < data.amount) {
-      throw new Error("Saldo insuficiente.");
-    }
-
     const feesResp = await fetchPlatformFees(supabase);
-    const { feeAmount, netAmount } = calculateWithdrawalAmounts(data.amount, feesResp.withdrawal);
+    const { feeAmount, payoutAmount, totalDebit } = calculateWithdrawalAmounts(
+      data.amount,
+      feesResp.withdrawal
+    );
 
-    if (netAmount <= 0) throw new Error("Valor líquido insuficiente após taxas.");
+    if (payoutAmount <= 0) throw new Error("Valor inválido para saque.");
+
+    if (!wallet || Number(wallet.balance || 0) < totalDebit) {
+      throw new Error(
+        `Saldo insuficiente. Necessário R$ ${totalDebit.toFixed(2)} (valor + taxa de R$ ${feeAmount.toFixed(2)}).`
+      );
+    }
 
     const { data: tx, error: txError } = await (supabase.from("transactions") as any)
       .insert({
         wallet_id: wallet.id,
-        amount: data.amount,
+        amount: totalDebit,
         fee_amount: feeAmount,
-        net_amount: netAmount,
+        net_amount: payoutAmount,
         type: "withdrawal",
         status: "pending",
         description: `Saque Pix para chave ${data.pixKey}`,
-        metadata: { pix_key: data.pixKey, pix_type: data.pixKeyType },
+        metadata: { pix_key: data.pixKey, pix_type: data.pixKeyType, payout: payoutAmount },
       })
       .select()
       .single();
@@ -229,17 +234,18 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
     if (txError) throw new Error(txError.message);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Debit full amount + platform fee from user balance
     await supabaseAdmin.rpc("adjust_wallet_balance", {
       p_wallet_id: wallet.id,
-      p_amount: -data.amount,
+      p_amount: -totalDebit,
     });
 
     try {
-      // camelCase aligned with EvoPay style; amount is the net payout
+      // Recipient receives the FULL requested amount (fee stays with the platform)
       const evoData = await callEvoPay("/pix/cash-out", {
         method: "POST",
         body: {
-          amount: Number(netAmount.toFixed(2)),
+          amount: Number(payoutAmount.toFixed(2)),
           pixKey: data.pixKey,
           pixKeyType: data.pixKeyType,
           clientReference: String(tx.id),
@@ -261,7 +267,7 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
       try {
         await supabaseAdmin.rpc("adjust_wallet_balance", {
           p_wallet_id: wallet.id,
-          p_amount: data.amount,
+          p_amount: totalDebit,
         });
         await (supabase.from("transactions") as any)
           .update({ status: "failed", metadata: { error: err.message } } as any)
@@ -275,7 +281,9 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
     return {
       success: true,
       transactionId: tx.id,
-      netAmount,
+      netAmount: payoutAmount,
+      totalDebit,
+      feeAmount,
     };
   });
 

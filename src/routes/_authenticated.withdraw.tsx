@@ -68,13 +68,20 @@ function WithdrawPage() {
 
   const calculatedFee = useMemo(() => {
     if (!fees || !amount || isNaN(parseFloat(amount))) return 0;
-    return fees.withdrawal.fixed || 0;
+    return Number(fees.withdrawal.fixed || 0);
   }, [fees, amount]);
 
-  const netAmount = useMemo(() => {
+  // Recipient receives the full amount; fee is extra debit from the user
+  const payoutAmount = useMemo(() => {
     if (!amount || isNaN(parseFloat(amount))) return 0;
-    return Math.max(0, parseFloat(amount) - calculatedFee);
-  }, [amount, calculatedFee]);
+    return parseFloat(amount);
+  }, [amount]);
+
+  const totalDebit = useMemo(() => {
+    return Math.round((payoutAmount + calculatedFee) * 100) / 100;
+  }, [payoutAmount, calculatedFee]);
+
+  const netAmount = payoutAmount; // compat for any leftover refs
 
 
 
@@ -91,7 +98,7 @@ function WithdrawPage() {
       return;
     }
 
-    if ((wallet?.balance || 0) < parseFloat(amount)) {
+    if ((wallet?.balance || 0) < totalDebit) {
       toast.error('Saldo insuficiente.');
       return;
     }
@@ -192,7 +199,7 @@ function WithdrawPage() {
                            </div>
                            <div className="flex justify-between text-xs font-black uppercase tracking-widest text-white">
                              <span>Valor a receber</span>
-                             <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(netAmount)}</span>
+                             <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalDebit)}</span>
                            </div>
                          </div>
                        )}
@@ -235,9 +242,13 @@ function WithdrawPage() {
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Taxa</span>
                 <span className="text-lg font-black text-red-500">-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedFee)}</span>
               </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Destinatário recebe</span>
+                <span className="text-lg font-black text-green-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(payoutAmount)}</span>
+              </div>
               <div className="pt-4 border-t border-white/5 flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Valor Líquido</span>
-                <span className="text-xl font-black text-green-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(netAmount)}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total debitado</span>
+                <span className="text-xl font-black text-white">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalDebit)}</span>
               </div>
             </div>
 

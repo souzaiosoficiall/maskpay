@@ -68,6 +68,7 @@ function PayQrPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [amountLocked, setAmountLocked] = useState(false);
 
   const { data: fees } = useQuery({
     queryKey: ['platform-fees'],
@@ -153,11 +154,9 @@ function PayQrPage() {
         stopCamera();
         setParsed(result);
         setManualKey(result.raw || rawIn);
-        setAmountOverride(
-          result.amount != null && result.amount > 0
-            ? String(result.amount).replace('.', ',')
-            : ''
-        );
+        const hasAmount = result.amount != null && result.amount > 0;
+        setAmountOverride(hasAmount ? String(result.amount).replace('.', ',') : '');
+        setAmountLocked(hasAmount);
         setSheetOpen(true);
         toast.success('QR Code lido com sucesso');
 
@@ -169,6 +168,7 @@ function PayQrPage() {
             const resolved = await doResolve({ data: { emv: result.raw } });
             if (resolved?.amount && resolved.amount > 0) {
               setAmountOverride(String(resolved.amount).replace('.', ','));
+              setAmountLocked(true);
               toast.success(
                 `Valor detectado: R$ ${Number(resolved.amount).toFixed(2).replace('.', ',')}`
               );
@@ -358,6 +358,7 @@ function PayQrPage() {
     setParsed(null);
     setManualKey('');
     setAmountOverride('');
+    setAmountLocked(false);
   };
 
   const openConfirm = () => {
@@ -585,10 +586,14 @@ function PayQrPage() {
                 <div className="relative">
                   <Input
                     value={amountOverride}
-                    onChange={(e) => setAmountOverride(e.target.value.replace(/[^\d.,]/g, ''))}
+                    onChange={(e) => {
+                      if (amountLocked) return;
+                      setAmountOverride(e.target.value.replace(/[^\d.,]/g, ''));
+                    }}
                     placeholder="0,00"
                     inputMode="decimal"
-                    className="bg-white/5 border-white/10 rounded-xl h-14 text-2xl font-black"
+                    readOnly={amountLocked}
+                    className={`bg-white/5 border-white/10 rounded-xl h-14 text-2xl font-black ${amountLocked ? 'opacity-80 cursor-not-allowed' : ''}`}
                     disabled={resolving}
                   />
                   {resolving && (
@@ -608,17 +613,20 @@ function PayQrPage() {
 
             <div className="rounded-2xl border border-white/10 bg-black/50 p-4 space-y-3">
               <div className="flex justify-between text-[11px] font-black uppercase tracking-widest">
-                <span className="text-muted-foreground">Valor do PIX</span>
-                <span>{formatBRL(payAmount)}</span>
+                <span className="text-muted-foreground">Destinatário recebe</span>
+                <span className="text-green-400">{formatBRL(payAmount)}</span>
               </div>
               <div className="flex justify-between text-[11px] font-black uppercase tracking-widest">
-                <span className="text-muted-foreground">Taxa MaskPay</span>
-                <span className="text-red-400">+ {formatBRL(feeFixed)}</span>
+                <span className="text-muted-foreground">Taxa MaskPay (do seu saldo)</span>
+                <span className="text-red-400">− {formatBRL(feeFixed)}</span>
               </div>
               <div className="flex justify-between items-center pt-3 border-t border-white/10">
-                <span className="text-[11px] font-black uppercase tracking-widest">Total</span>
+                <span className="text-[11px] font-black uppercase tracking-widest">Debitado da sua conta</span>
                 <span className="text-xl font-black text-white">{formatBRL(totalDebit)}</span>
               </div>
+              <p className="text-[9px] font-bold text-muted-foreground/70 leading-relaxed">
+                A taxa é cobrada da sua conta. Quem recebe fica com o valor integral do PIX.
+              </p>
               <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 <Wallet className="w-3.5 h-3.5" />
                 Saldo disponível: {formatBRL(balance)}

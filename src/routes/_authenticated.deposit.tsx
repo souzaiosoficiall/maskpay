@@ -179,11 +179,11 @@ function DepositPage() {
                           className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2"
                         >
                           <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            <span>Taxa da plataforma</span>
+                            <span>Taxa (descontada do depósito)</span>
                             <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedFee)}</span>
                           </div>
                           <div className="flex justify-between text-xs font-black uppercase tracking-widest text-white">
-                            <span>Valor líquido</span>
+                            <span>Você recebe na carteira</span>
                             <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(netAmount)}</span>
                           </div>
                         </motion.div>
