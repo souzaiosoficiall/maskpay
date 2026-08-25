@@ -44,16 +44,21 @@ export default function DashboardLayout() {
   const sessionReady = useSessionReady();
   const fetchProfile = useServerFn(getProfile);
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ['profile'],
     queryFn: () => fetchProfile({}),
     enabled: sessionReady,
-    staleTime: 5000,
-  }) as { data: ProfileWithRole | undefined };
+    staleTime: 10_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  }) as { data: ProfileWithRole | undefined; isLoading: boolean };
 
-  const isKycLocked =
-    !!profile && profile.role !== 'admin' && profile.verification_status !== 'verified';
-  const canAccess = !isKycLocked || profile?.role === 'admin';
+  // Locked by default until profile loads AND admin verified the account.
+  // (Previously: while profile was undefined, canAccess was true → options unlocked on reload)
+  const canAccess =
+    !!profile &&
+    (profile.role === 'admin' || profile.verification_status === 'verified');
+  const isKycLocked = !canAccess;
 
   useEffect(() => {
     setIsMoreOpen(false);
@@ -139,7 +144,7 @@ export default function DashboardLayout() {
             className={cn('h-4 w-4 transition-transform', isTransferMenuOpen && 'rotate-180')}
           />
         </button>
-        {isTransferMenuOpen && (
+        {isTransferMenuOpen && canAccess && (
           <div className="mb-2 space-y-1 pl-4">
             {[
               { label: 'Saque', to: '/withdraw' },
@@ -147,47 +152,49 @@ export default function DashboardLayout() {
               { label: 'Depositar', to: '/deposit' },
               { label: 'Transferência', to: '/transfer' },
             ].map((item) => (
-              <Link
+              <button
                 key={item.to}
-                to={item.to as any}
+                type="button"
+                onClick={() => go(item.to)}
                 className={cn(
-                  'block rounded-lg px-3 py-2 text-[12px] font-medium',
+                  'block w-full rounded-lg px-3 py-2 text-left text-[12px] font-medium',
                   'text-muted-foreground hover:text-foreground',
-                  !canAccess && 'pointer-events-none opacity-50',
                 )}
               >
                 {item.label}
-              </Link>
+              </button>
             ))}
           </div>
         )}
 
         {[
-          { label: 'Movimentações', to: '/transactions', icon: Webhook },
-          { label: 'Taxas', to: '/rates', icon: Receipt },
-          { label: 'API', to: '/api-keys', icon: FileCode2 },
-          { label: 'Documentação', to: '/docs', icon: BookOpen },
-          { label: 'Suporte', to: '/support', icon: MessageSquare },
-          { label: 'Ajustes', to: '/settings', icon: Settings },
-        ].map((item) => (
-          <Link
-            key={item.to}
-            to={item.to as any}
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
-              isActive(item.to)
-                ? 'dash-nav-active border border-border bg-secondary text-foreground'
-                : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground',
-              item.to !== '/docs' && item.to !== '/support' && !canAccess && 'pointer-events-none opacity-50',
-            )}
-          >
-            <item.icon className="h-5 w-5" />
-            {item.label}
-            {!canAccess && item.to !== '/docs' && item.to !== '/support' && (
-              <Lock className="ml-auto h-3 w-3 opacity-40" />
-            )}
-          </Link>
-        ))}
+          { label: 'Movimentações', to: '/transactions', icon: Webhook, lock: true },
+          { label: 'Taxas', to: '/rates', icon: Receipt, lock: true },
+          { label: 'API', to: '/api-keys', icon: FileCode2, lock: true },
+          { label: 'Documentação', to: '/docs', icon: BookOpen, lock: false },
+          { label: 'Suporte', to: '/support', icon: MessageSquare, lock: false },
+          { label: 'Ajustes', to: '/settings', icon: Settings, lock: true },
+        ].map((item) => {
+          const locked = item.lock && !canAccess;
+          return (
+            <button
+              key={item.to}
+              type="button"
+              onClick={() => go(item.to, item.lock)}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
+                isActive(item.to)
+                  ? 'dash-nav-active border border-border bg-secondary text-foreground'
+                  : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground',
+                locked && 'cursor-not-allowed opacity-50',
+              )}
+            >
+              <item.icon className="h-5 w-5" />
+              {item.label}
+              {locked && <Lock className="ml-auto h-3 w-3 opacity-40" />}
+            </button>
+          );
+        })}
       </nav>
       <div className="border-t border-border p-4">
         <Button

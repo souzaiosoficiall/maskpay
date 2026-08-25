@@ -59,21 +59,26 @@ function DashboardPage() {
     queryKey: ['profile'],
     queryFn: () => fetchProfile({}),
     enabled: sessionReady,
-    staleTime: 15_000,
+    staleTime: 10_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
-  const isKycLocked =
-    !!profile && profile.role !== 'admin' && profile.verification_status !== 'verified';
-  const canAccess = !isKycLocked || profile?.role === 'admin';
+  // Locked until profile is loaded and admin has verified the account
+  // (bug: while profile was undefined, canAccess was true → options free on reload)
+  const canAccess =
+    !!profile &&
+    (profile.role === 'admin' || profile.verification_status === 'verified');
+  const isKycLocked = !canAccess;
 
   const showUnverifiedBanner =
     !isLoadingProfile &&
     !!profile &&
     profile.role !== 'admin' &&
-    (profile.verification_status === 'unverified' ||
-      profile.verification_status === null ||
-      profile.verification_status === undefined ||
-      profile.verification_status === '');
+    profile.verification_status !== 'verified' &&
+    profile.verification_status !== 'pending' &&
+    profile.verification_status !== 'pending_review' &&
+    profile.verification_status !== 'rejected';
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet', profile?.id],

@@ -244,27 +244,34 @@ function AuthenticatedLayout() {
       return;
     }
 
-    // Se o perfil existe mas não é admin, verifica se a conta está verificada
+    // Se o perfil existe mas não é admin, verifica se a conta está verificada pelo admin
     if (profile.role !== 'admin') {
       const isVerified = profile.verification_status === 'verified';
-      const isPending = profile.verification_status === 'pending' || profile.verification_status === 'pending_review';
-      
-      // Permitir acesso APENAS a rotas essenciais se não estiver verificado
+      const isPending =
+        profile.verification_status === 'pending' ||
+        profile.verification_status === 'pending_review';
+
+      // Somente estas rotas liberadas antes da validação do admin
       const allowedPaths = ['/dashboard', '/support', '/verify'];
       const currentPath = location.pathname;
-      
-      const isAllowed = allowedPaths.some(path => currentPath === path || currentPath.startsWith(path + '/'));
+      const isAllowed = allowedPaths.some(
+        (path) => currentPath === path || currentPath.startsWith(path + '/'),
+      );
 
-      // Se não estiver verificado e não for uma rota permitida, volta pro dashboard
+      // Bloqueia deposit/withdraw/transfer/settings/api/etc até o admin validar
       if (!isVerified && !isAllowed) {
-        console.log(`[AuthenticatedLayout] Access denied to ${currentPath} (KYC pending). Redirecting to dashboard.`);
+        console.log(
+          `[AuthenticatedLayout] Access denied to ${currentPath} (KYC pending). Redirecting to dashboard.`,
+        );
         navigate({ to: '/dashboard', replace: true });
         return;
       }
 
-      // Se já enviou documentos (pending), não pode acessar /verify de novo
+      // Já enviou documentos (pending) → não pode reabrir /verify
       if (isPending && currentPath.startsWith('/verify')) {
-        console.log(`[AuthenticatedLayout] Verification already pending. Redirecting to dashboard.`);
+        console.log(
+          `[AuthenticatedLayout] Verification already pending. Redirecting to dashboard.`,
+        );
         navigate({ to: '/dashboard', replace: true });
         return;
       }
