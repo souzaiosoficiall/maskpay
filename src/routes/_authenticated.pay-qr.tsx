@@ -106,6 +106,11 @@ function PayQrPage() {
       streamRef.current = null;
     }
     if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch {
+        /* ignore */
+      }
       videoRef.current.srcObject = null;
     }
     setScanning(false);
@@ -113,15 +118,41 @@ function PayQrPage() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  // Preload jsQR as soon as the page opens
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (jsQRRef.current) return;
+      try {
+        const mod = await import('jsqr');
+        if (!cancelled) jsQRRef.current = (mod as any).default || mod;
+      } catch {
+        try {
+          const mod = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');
+          if (!cancelled) jsQRRef.current = (mod as any).default || (window as any).jsQR || mod;
+        } catch (e) {
+          console.warn('jsQR preload failed', e);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   /** Called whenever a QR string is decoded — always opens the payment sheet. */
   const applyPayload = useCallback(
     async (text: string) => {
+      const rawIn = (text || '').trim();
+      if (!rawIn || rawIn.length < 10) return;
+      // Avoid double-fire from consecutive frames
+      if (scanningActiveRef.current === false && sheetOpen) return;
+
       try {
-        const result = parsePixEmv(text);
+        const result = parsePixEmv(rawIn);
         stopCamera();
         setParsed(result);
-        // Always use full PIX copia-e-cola (EMV)
-        setManualKey(result.raw || text.trim());
+        setManualKey(result.raw || rawIn);
         setAmountOverride(
           result.amount != null && result.amount > 0
             ? String(result.amount).replace('.', ',')
@@ -130,7 +161,6 @@ function PayQrPage() {
         setSheetOpen(true);
         toast.success('QR Code lido com sucesso');
 
-        // Dynamic PIX: amount is often only at the location URL — resolve on server
         const needsResolve =
           !(result.amount && result.amount > 0) || !result.pixKey;
         if (needsResolve && (result.pixUrl || result.raw?.startsWith('0002'))) {
@@ -139,6 +169,9 @@ function PayQrPage() {
             const resolved = await doResolve({ data: { emv: result.raw } });
             if (resolved?.amount && resolved.amount > 0) {
               setAmountOverride(String(resolved.amount).replace('.', ','));
+              toast.success(
+                `Valor detectado: R$ ${Number(resolved.amount).toFixed(2).replace('.', ',')}`
+              );
             }
             if (resolved?.merchantName) {
               setParsed((prev) =>
@@ -152,9 +185,6 @@ function PayQrPage() {
                 prev ? { ...prev, pixKey: resolved.pixKey || prev.pixKey } : prev
               );
             }
-            if (resolved?.amount && resolved.amount > 0) {
-              toast.success(`Valor detectado: R$ ${Number(resolved.amount).toFixed(2).replace('.', ',')}`);
-            }
           } catch (err) {
             console.warn('resolvePixDynamic failed', err);
           } finally {
@@ -162,10 +192,11 @@ function PayQrPage() {
           }
         }
       } catch (err: any) {
-        toast.error(err?.message || 'QR inválido');
+        // Keep camera running if payload was garbage noise from a bad frame
+        console.warn('parsePixEmv', err);
       }
     },
-    [stopCamera, doResolve]
+    [stopCamera, doResolve, sheetOpen]
   );
 
   const startCamera = async () => {
@@ -175,14 +206,21 @@ function PayQrPage() {
         throw new Error('Câmera não suportada neste dispositivo.');
       }
 
+      // Ensure jsQR is ready
       if (!jsQRRef.current) {
         try {
           const mod = await import('jsqr');
           jsQRRef.current = (mod as any).default || mod;
         } catch {
-          const mod = await import(/* @vite-ignore */ 'https://esm.sh/jsqr@1.4.0');
-          jsQRRef.current = (mod as any).default || mod;
+          // last resort: global from script
+          if ((window as any).jsQR) {
+            jsQRRef.current = (window as any).jsQR;
+          }
         }
+      }
+
+      if (!jsQRRef.current && !(window as any).BarcodeDetector) {
+        toast.error('Leitor indisponível. Use Pix Copia e Cola.');
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -194,12 +232,16 @@ function PayQrPage() {
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute('playsinline', 'true');
-        videoRef.current.muted = true;
-        await videoRef.current.play();
-      }
+
+      const video = videoRef.current;
+      if (!video) throw new Error('Elemento de vídeo não encontrado.');
+
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+      video.muted = true;
+      video.srcObject = stream;
+      await video.play();
+
       setScanning(true);
       scanningActiveRef.current = true;
 
@@ -214,23 +256,34 @@ function PayQrPage() {
         }
       }
 
+      let lastAttempt = 0;
+
       const tick = async () => {
         if (!scanningActiveRef.current) return;
-        const video = videoRef.current;
+        const v = videoRef.current;
         const canvas = canvasRef.current;
-        if (!video || !canvas || video.readyState < 2) {
-          scanTimerRef.current = window.setTimeout(tick, 200);
+        if (!v || !canvas || v.readyState < 2) {
+          scanTimerRef.current = window.setTimeout(tick, 150);
           return;
         }
 
+        const now = Date.now();
+        // Throttle decode to ~6 fps for performance
+        if (now - lastAttempt < 160) {
+          scanTimerRef.current = window.setTimeout(tick, 80);
+          return;
+        }
+        lastAttempt = now;
+
         try {
+          // 1) Native BarcodeDetector
           if (detectorRef.current) {
             try {
-              const codes = await detectorRef.current.detect(video);
+              const codes = await detectorRef.current.detect(v);
               if (codes?.length) {
                 const raw = codes[0].rawValue || codes[0].rawData;
-                if (raw) {
-                  applyPayload(String(raw));
+                if (raw && String(raw).length > 10) {
+                  await applyPayload(String(raw));
                   return;
                 }
               }
@@ -239,31 +292,44 @@ function PayQrPage() {
             }
           }
 
-          const w = video.videoWidth;
-          const h = video.videoHeight;
-          if (w > 0 && h > 0 && jsQRRef.current) {
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            if (ctx) {
-              ctx.drawImage(video, 0, 0, w, h);
-              const imageData = ctx.getImageData(0, 0, w, h);
-              const code = jsQRRef.current(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: 'attemptBoth',
-              });
-              if (code?.data) {
-                applyPayload(String(code.data));
-                return;
+          // 2) jsQR on a downscaled frame (much more reliable / faster)
+          if (jsQRRef.current) {
+            const vw = v.videoWidth;
+            const vh = v.videoHeight;
+            if (vw > 0 && vh > 0) {
+              const maxW = 640;
+              const scale = vw > maxW ? maxW / vw : 1;
+              const w = Math.max(1, Math.floor(vw * scale));
+              const h = Math.max(1, Math.floor(vh * scale));
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d', { willReadFrequently: true });
+              if (ctx) {
+                ctx.drawImage(v, 0, 0, w, h);
+                const imageData = ctx.getImageData(0, 0, w, h);
+                const code = jsQRRef.current(
+                  imageData.data,
+                  imageData.width,
+                  imageData.height,
+                  { inversionAttempts: 'attemptBoth' }
+                );
+                if (code?.data && String(code.data).length > 10) {
+                  await applyPayload(String(code.data));
+                  return;
+                }
               }
             }
           }
         } catch (err) {
           console.warn('scan tick', err);
         }
-        scanTimerRef.current = window.setTimeout(tick, 250);
+
+        if (scanningActiveRef.current) {
+          scanTimerRef.current = window.setTimeout(tick, 120);
+        }
       };
 
-      scanTimerRef.current = window.setTimeout(tick, 300);
+      scanTimerRef.current = window.setTimeout(tick, 250);
     } catch (err: any) {
       const msg =
         err?.name === 'NotAllowedError'
