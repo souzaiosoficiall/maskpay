@@ -196,7 +196,7 @@ export default function DashboardLayout() {
   );
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-[#0a0e13] text-foreground selection:bg-white/10">
+    <div className="flex h-[100dvh] overflow-hidden bg-background text-foreground selection:bg-white/10">
       <DesktopNav />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
