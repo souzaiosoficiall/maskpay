@@ -36,6 +36,8 @@ import { useTheme } from '@/hooks/useTheme';
 import {
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -445,135 +447,62 @@ function DashboardPage() {
     </div>
   );
 
-  /* ========== DESKTOP — painel profissional (fintech) ========== */
+  /* ========== DESKTOP only — premium panel (mobile untouched) ========== */
   const maxBar = Math.max(...chartData.map((d: any) => Number(d.value) || 0), 1);
+  const spark = chartData.slice(-8).map((d: any) => Number(d.value) || 0);
+  const sparkMax = Math.max(...spark, 1);
+  const sparkPath = (() => {
+    if (spark.length < 2) return '';
+    const w = 120;
+    const h = 36;
+    return spark
+      .map((v, i) => {
+        const x = (i / (spark.length - 1)) * w;
+        const y = h - (v / sparkMax) * (h - 4) - 2;
+        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
+  })();
+
+  const fullName = profile?.full_name || firstName || 'usuário';
   const todayLabel = new Date().toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   });
-  const fullName = profile?.full_name || firstName || 'usuário';
-
-  const kpiCards = [
-    {
-      label: 'Saldo disponível',
-      value: hideValues ? '••••••' : balanceStr,
-      hint: hideValues
-        ? '••••'
-        : `${(txStats?.totalFees ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} taxas`,
-      hintTone: 'text-muted-foreground',
-      icon: Wallet,
-    },
-    {
-      label: 'Volume transacionado',
-      value: hideValues
-        ? '••••'
-        : (txStats?.dailyVolume || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-      hint: 'no período selecionado',
-      hintTone: 'text-muted-foreground',
-      icon: Activity,
-    },
-    {
-      label: 'Total retirado',
-      value: hideValues
-        ? '••••'
-        : (txStats?.totalWithdrawn || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-      hint: 'saques concluídos',
-      hintTone: 'text-muted-foreground',
-      icon: ArrowUpFromLine,
-    },
-    {
-      label: 'Total de transações',
-      value: String(txStats?.totalTransactions || 0),
-      hint: 'movimentações registradas',
-      hintTone: 'text-muted-foreground',
-      icon: CreditCard,
-    },
-  ];
 
   const desktop = (
-    <div className="relative z-10 hidden w-full space-y-6 font-sans lg:block">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[1.65rem] font-semibold tracking-tight text-white">
-            {greeting}, {fullName}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Aqui está um resumo da sua conta.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-white/10 bg-[#12161c] px-3 py-1.5 text-xs text-muted-foreground">
-            Hoje
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            className="h-9 w-9 rounded-lg border border-white/10 bg-[#12161c] text-muted-foreground hover:text-white"
-          >
-            {isLight ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setHideValues(!hideValues)}
-            className="h-9 w-9 rounded-lg border border-white/10 bg-[#12161c] text-muted-foreground hover:text-white"
-          >
-            {hideValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-          <Button
-            disabled={!canAccess}
-            onClick={() => navigate({ to: '/deposit' })}
-            className="h-9 rounded-lg bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-40"
-          >
-            Depositar
-          </Button>
-        </div>
-      </div>
+    <div className="relative z-10 hidden w-full font-sans lg:block">
+      {/* soft ambient glow */}
+      <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-white/[0.03] blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 top-40 h-72 w-72 rounded-full bg-emerald-500/[0.04] blur-3xl" />
 
-      {kycBanners}
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {kpiCards.map((kpi) => (
-          <div
-            key={kpi.label}
-            className="rounded-xl border border-white/[0.06] bg-[#12161c] p-4 shadow-sm"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-[13px] font-medium text-muted-foreground">{kpi.label}</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-muted-foreground">
-                <kpi.icon className="h-4 w-4" />
-              </div>
+      <div className="relative space-y-5">
+        {/* Title row */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <span className="text-[13px] font-medium text-muted-foreground">Dashboard</span>
+              <span className="inline-flex h-5 items-center rounded-full bg-emerald-500/15 px-2 text-[10px] font-semibold text-emerald-400">
+                ao vivo
+              </span>
             </div>
-            <p className="text-2xl font-semibold tracking-tight text-white tabular-nums">
-              {kpi.value}
+            <h1 className="text-3xl font-semibold tracking-tight text-white">Overview</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {greeting}, {fullName} — resumo da sua conta MaskPay
             </p>
-            <p className={cn('mt-1.5 text-xs', kpi.hintTone)}>{kpi.hint}</p>
           </div>
-        ))}
-      </div>
-
-      {/* Chart + methods */}
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-12 rounded-xl border border-white/[0.06] bg-[#12161c] p-5 xl:col-span-8">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-white">Receita de {todayLabel}</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">Entradas no período</p>
-            </div>
-            <div className="flex gap-1 rounded-lg border border-white/10 bg-black/30 p-0.5">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-0.5 rounded-xl border border-white/[0.08] bg-white/[0.03] p-1">
               {['Semana', 'Mês', 'Ano'].map((p) => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setActivePeriod(p)}
                   className={cn(
-                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
                     activePeriod === p
-                      ? 'bg-white text-black'
+                      ? 'bg-white text-black shadow-sm'
                       : 'text-muted-foreground hover:text-white',
                   )}
                 >
@@ -581,148 +510,312 @@ function DashboardPage() {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="h-[260px] w-full">
-            {chartData.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground/50">
-                Sem dados de gráfico ainda
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }}
-                  />
-                  <YAxis hide />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                    contentStyle={{
-                      background: '#0f1419',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 10,
-                      fontSize: 12,
-                    }}
-                  />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={36}>
-                    {chartData.map((entry: any, index: number) => {
-                      const v = Number(entry.value) || 0;
-                      const isPeak = v === maxBar && v > 0;
-                      return (
-                        <Cell key={`cell-${index}`} fill={isPeak ? '#3b82f6' : 'rgba(59,130,246,0.25)'} />
-                      );
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-9 w-9 rounded-xl border border-white/[0.08] bg-white/[0.03] text-muted-foreground hover:text-white"
+            >
+              {isLight ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setHideValues(!hideValues)}
+              className="h-9 w-9 rounded-xl border border-white/[0.08] bg-white/[0.03] text-muted-foreground hover:text-white"
+            >
+              {hideValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+            <Button
+              disabled={!canAccess}
+              onClick={() => navigate({ to: '/deposit' })}
+              className="h-9 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-40"
+            >
+              Depositar
+            </Button>
           </div>
         </div>
 
-        <div className="col-span-12 rounded-xl border border-white/[0.06] bg-[#12161c] p-5 xl:col-span-4">
-          <h2 className="mb-4 text-sm font-semibold text-white">Métodos de pagamento</h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg border border-white/[0.05] bg-black/20 px-3 py-3">
-              <div className="flex items-center gap-3">
-                <span className="h-2 w-2 rounded-full bg-sky-400" />
-                <span className="text-sm text-white">PIX</span>
-              </div>
-              <span className="text-sm font-medium tabular-nums text-muted-foreground">
-                {typeBreakdown.find((r) => r.key === 'pix' || r.label?.toLowerCase?.().includes('pix'))?.pct ??
-                  (txStats?.totalTransactions ? 100 : 0)}
-                %
-              </span>
+        {kycBanners}
+
+        {/* Metric cards with sparklines */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            <p className="text-sm font-medium text-white">Saldo disponível</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Capital livre na carteira</p>
+            <p className="mt-4 text-[1.75rem] font-semibold tracking-tight text-white tabular-nums">
+              {hideValues ? '••••••' : balanceStr}
+            </p>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <p className="text-xs font-medium text-emerald-400/90">
+                {hideValues
+                  ? '••••'
+                  : `${(txStats?.totalFees ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em taxas`}
+              </p>
+              {sparkPath && (
+                <svg width="120" height="36" className="opacity-90">
+                  <path d={sparkPath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
             </div>
-            {quickActions.map((action) => {
-              const locked = action.lock && !canAccess;
-              return (
-                <button
-                  key={action.label}
-                  type="button"
-                  disabled={locked}
-                  onClick={() => !locked && navigate({ to: action.to as any })}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg border border-white/[0.05] bg-black/20 px-3 py-2.5 text-left text-sm text-white transition-colors hover:bg-white/[0.04]',
-                    locked && 'opacity-40',
-                  )}
-                >
-                  <action.icon className="h-4 w-4 text-muted-foreground" />
-                  {action.label}
-                  {locked && <Lock className="ml-auto h-3.5 w-3.5 text-muted-foreground" />}
-                </button>
-              );
-            })}
           </div>
-        </div>
-      </div>
 
-      {/* Last transactions */}
-      <div className="rounded-xl border border-white/[0.06] bg-[#12161c] p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Últimas 10 transações</h2>
-          <button
-            type="button"
-            onClick={() => canAccess && navigate({ to: '/transactions' })}
-            className="text-xs font-medium text-muted-foreground hover:text-white"
-          >
-            Ver todas
-          </button>
-        </div>
-        {isLoadingTx && (
-          <div className="flex justify-center py-10">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/30" />
+          <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            <p className="text-sm font-medium text-white">Volume transacionado</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Movimentação no período</p>
+            <p className="mt-4 text-[1.75rem] font-semibold tracking-tight text-white tabular-nums">
+              {hideValues
+                ? '••••'
+                : (txStats?.dailyVolume || 0).toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+            </p>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <p className="text-xs font-medium text-sky-400/90">
+                {txStats?.totalTransactions || 0} operações
+              </p>
+              {sparkPath && (
+                <svg width="120" height="36" className="opacity-90">
+                  <path d={sparkPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
+            </div>
           </div>
-        )}
-        {!isLoadingTx && recentDesktop.length === 0 && (
-          <p className="py-10 text-center text-sm text-muted-foreground/60">
-            Nenhuma transação encontrada.
-          </p>
-        )}
-        {!isLoadingTx && recentDesktop.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-white/[0.05]">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.06] text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">Tipo</th>
-                  <th className="px-4 py-2.5 font-medium">Data</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Valor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentDesktop.map((tx: any, i: number) => {
-                  const { formatted, isOut } = formatAmount(tx.amount, tx.type);
+
+          <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            <p className="text-sm font-medium text-white">Total retirado</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Saques concluídos</p>
+            <p className="mt-4 text-[1.75rem] font-semibold tracking-tight text-white tabular-nums">
+              {hideValues
+                ? '••••'
+                : (txStats?.totalWithdrawn || 0).toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+            </p>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <p className="text-xs font-medium text-violet-400/90">
+                ticket médio{' '}
+                {hideValues
+                  ? '••••'
+                  : (txStats?.averageTicket || 0).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+              </p>
+              {sparkPath && (
+                <svg width="120" height="36" className="opacity-90">
+                  <path d={sparkPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Chart + side panel */}
+        <div className="grid grid-cols-12 gap-4">
+          <div className="relative col-span-12 overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-transparent p-5 xl:col-span-8">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-white">Fluxo de receita</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Entradas · {todayLabel} · período {activePeriod.toLowerCase()}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {quickActions.map((action) => {
+                  const locked = action.lock && !canAccess;
                   return (
-                    <tr
-                      key={tx.id || i}
-                      className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]"
+                    <button
+                      key={action.label}
+                      type="button"
+                      disabled={locked}
+                      onClick={() => !locked && navigate({ to: action.to as any })}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/[0.06]',
+                        locked && 'opacity-40',
+                      )}
                     >
-                      <td className="px-4 py-3 font-medium text-white">{typeLabel(tx.type)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDate(tx.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-md bg-white/[0.04] px-2 py-0.5 text-xs text-muted-foreground">
-                          {tx.status || '—'}
-                        </span>
-                      </td>
-                      <td
-                        className={cn(
-                          'px-4 py-3 text-right font-semibold tabular-nums',
-                          isOut ? 'text-red-400' : 'text-emerald-400',
-                        )}
-                      >
-                        {hideValues ? '••••' : `${isOut ? '-' : '+'}${formatted}`}
-                      </td>
-                    </tr>
+                      <action.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                      {action.label}
+                    </button>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            </div>
+
+            <div className="h-[280px] w-full">
+              {chartData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground/50">
+                  Sem dados de gráfico ainda
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="maskpayArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }}
+                    />
+                    <YAxis hide />
+                    <Tooltip
+                      cursor={{ stroke: 'rgba(52,211,153,0.35)', strokeWidth: 1 }}
+                      contentStyle={{
+                        background: '#0c1014',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 12,
+                        fontSize: 12,
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#34d399"
+                      strokeWidth={2.5}
+                      fill="url(#maskpayArea)"
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#34d399', stroke: '#0c1014', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                AVG{' '}
+                <span className="font-semibold text-emerald-400">
+                  {hideValues
+                    ? '••••'
+                    : (txStats?.averageTicket || 0).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                </span>
+              </span>
+              <span>{activePeriod}</span>
+            </div>
           </div>
-        )}
+
+          <div className="col-span-12 space-y-4 xl:col-span-4">
+            <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-transparent p-5">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+              <h2 className="text-sm font-semibold text-white">Métodos</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Canais ativos na conta</p>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/20 px-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-xs font-bold text-emerald-400">
+                      PIX
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-white">PIX</p>
+                      <p className="text-[11px] text-muted-foreground">Instantâneo</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums text-white">
+                    {txStats?.totalTransactions ? '100%' : '0%'}
+                  </span>
+                </div>
+                {typeBreakdown.map((row) => (
+                  <div
+                    key={row.key}
+                    className="flex items-center justify-between px-1 text-xs text-muted-foreground"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: row.color }} />
+                      {row.label}
+                    </span>
+                    <span className="font-medium text-white/80">
+                      {row.count} · {row.pct}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Transactions table */}
+        <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-transparent p-5">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Últimas movimentações</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Extrato recente da carteira</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => canAccess && navigate({ to: '/transactions' })}
+              className="text-xs font-medium text-muted-foreground transition hover:text-white"
+            >
+              Ver todas →
+            </button>
+          </div>
+          {isLoadingTx && (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/30" />
+            </div>
+          )}
+          {!isLoadingTx && recentDesktop.length === 0 && (
+            <p className="py-12 text-center text-sm text-muted-foreground/50">
+              Nenhuma transação encontrada.
+            </p>
+          )}
+          {!isLoadingTx && recentDesktop.length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-white/[0.05]">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-2.5 font-medium">Tipo</th>
+                    <th className="px-4 py-2.5 font-medium">Data</th>
+                    <th className="px-4 py-2.5 font-medium">Status</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentDesktop.map((tx: any, i: number) => {
+                    const { formatted, isOut } = formatAmount(tx.amount, tx.type);
+                    return (
+                      <tr
+                        key={tx.id || i}
+                        className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]"
+                      >
+                        <td className="px-4 py-3 font-medium text-white">{typeLabel(tx.type)}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{formatDate(tx.created_at)}</td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[11px] text-muted-foreground">
+                            {tx.status || '—'}
+                          </span>
+                        </td>
+                        <td
+                          className={cn(
+                            'px-4 py-3 text-right font-semibold tabular-nums',
+                            isOut ? 'text-red-400' : 'text-emerald-400',
+                          )}
+                        >
+                          {hideValues ? '••••' : `${isOut ? '-' : '+'}${formatted}`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

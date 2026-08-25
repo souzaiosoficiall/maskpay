@@ -98,7 +98,7 @@ export default function DashboardLayout() {
 
   /** Desktop sidebar (kept for large screens) */
   const DesktopNav = () => (
-    <aside className="hidden lg:flex w-[240px] flex-col border-r border-white/[0.06] bg-[#0c1015] shrink-0">
+    <aside className="hidden lg:flex w-[248px] flex-col border-r border-white/[0.06] bg-[#080b0f] shrink-0">
       <div className="flex h-16 items-center gap-3 border-b border-white/5 px-6">
         <img src={maskPlatformAsset.url} alt="" className="h-8 w-8 object-contain" />
         <span className="text-base font-semibold tracking-tight text-white">MaskPay</span>
