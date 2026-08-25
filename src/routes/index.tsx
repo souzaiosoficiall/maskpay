@@ -35,40 +35,67 @@ import { calculateDepositAmounts } from "@/lib/fees-logic";
 
 function Calculator() {
   const [value, setValue] = useState<string>("");
-  const [fees, setFees] = useState<{ deposit: { percentage: number; fixed: number }; withdrawal: { fixed: number } }>({
-    deposit: { percentage: 2.49, fixed: 0.40 },
-    withdrawal: { fixed: 0.80 }
+  const [route, setRoute] = useState<"WHITE" | "BLACK">("WHITE");
+  const [feesByRoute, setFeesByRoute] = useState<{
+    WHITE: { deposit: { percentage: number; fixed: number }; withdrawal: { fixed: number } };
+    BLACK: { deposit: { percentage: number; fixed: number }; withdrawal: { fixed: number } };
+  }>({
+    WHITE: {
+      deposit: { percentage: 2.49, fixed: 0.40 },
+      withdrawal: { fixed: 0.80 },
+    },
+    BLACK: {
+      // Padrão BLACK: 7,90% + R$ 1,00 recebimento | R$ 1,00 saque
+      deposit: { percentage: 7.9, fixed: 1.0 },
+      withdrawal: { fixed: 1.0 },
+    },
   });
 
-  // Fetch real fees from public endpoint or client-side supabase if public access is allowed
+  const fees = feesByRoute[route];
+
+  // Fetch real fees (WHITE + BLACK) from platform_configs
   useEffect(() => {
     const fetchFees = async () => {
-      const { data, error } = await import('@/integrations/supabase/client').then(m => 
-        m.supabase.from('platform_configs').select('key, value').in('key', ['pix_deposit_fees', 'pix_withdrawal_fees'])
+      const { data, error } = await import("@/integrations/supabase/client").then((m) =>
+        m.supabase
+          .from("platform_configs")
+          .select("key, value")
+          .in("key", [
+            "pix_deposit_fees",
+            "pix_withdrawal_fees",
+            "pix_deposit_fees_black",
+            "pix_withdrawal_fees_black",
+          ]),
       );
-      
+
       if (data && !error) {
-        const newFees: any = {};
+        const cfg: Record<string, any> = {};
         data.forEach((item: any) => {
-          newFees[item.key] = item.value;
+          cfg[item.key] = item.value;
         });
-        setFees({
-          deposit: newFees.pix_deposit_fees || { percentage: 2.49, fixed: 0.40 },
-          withdrawal: newFees.pix_withdrawal_fees || { fixed: 0.80 }
+        setFeesByRoute({
+          WHITE: {
+            deposit: cfg.pix_deposit_fees || { percentage: 2.49, fixed: 0.4 },
+            withdrawal: cfg.pix_withdrawal_fees || { fixed: 0.8 },
+          },
+          BLACK: {
+            deposit: cfg.pix_deposit_fees_black || { percentage: 7.9, fixed: 1.0 },
+            withdrawal: cfg.pix_withdrawal_fees_black || { fixed: 1.0 },
+          },
         });
       }
     };
     fetchFees();
   }, []);
-  
+
   const calculateTotal = (input: string) => {
     const numValue = parseFloat(input.replace(",", ".")) || 0;
     if (numValue === 0) return 0;
-    
+
     // Total a receber = Valor da venda - Taxa de Depósito - Taxa de Saque
     const { netAmount: amountAfterDepositFee } = calculateDepositAmounts(numValue, fees.deposit);
     const totalNet = amountAfterDepositFee - fees.withdrawal.fixed;
-    
+
     return Math.max(0, totalNet);
   };
 
@@ -81,16 +108,16 @@ function Calculator() {
         whileInView={{ opacity: 1, x: 0 }}
         whileHover={{ scale: 1.1, rotate: 2 }}
         viewport={{ once: true }}
-        transition={{ 
+        transition={{
           type: "spring",
           stiffness: 300,
-          damping: 20
+          damping: 20,
         }}
         className="w-full md:w-1/2 flex justify-center md:justify-end cursor-pointer"
       >
-        <img 
-          src={pixCalculatorAsset.url} 
-          alt="Calculadora de Taxas" 
+        <img
+          src={pixCalculatorAsset.url}
+          alt="Calculadora de Taxas"
           className="w-full max-w-[450px] h-auto object-contain drop-shadow-2xl transition-all duration-300 hover:drop-shadow-[0_20px_40px_rgba(255,255,255,0.1)]"
         />
       </motion.div>
@@ -106,6 +133,34 @@ function Calculator() {
           <div className="space-y-8 relative z-10">
             <div>
               <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter mb-2">DESCUBRA QUANTO VOCÊ VAI RECEBER</h3>
+            </div>
+
+            {/* Seletor WHITE / BLACK */}
+            <div className="flex p-1 rounded-2xl bg-white/5 border border-white/10">
+              <button
+                type="button"
+                onClick={() => setRoute("WHITE")}
+                className={cn(
+                  "flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all",
+                  route === "WHITE"
+                    ? "bg-white text-black shadow-lg"
+                    : "text-muted-foreground hover:text-white",
+                )}
+              >
+                WHITE
+              </button>
+              <button
+                type="button"
+                onClick={() => setRoute("BLACK")}
+                className={cn(
+                  "flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all",
+                  route === "BLACK"
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "text-muted-foreground hover:text-white",
+                )}
+              >
+                BLACK
+              </button>
             </div>
 
             <div className="space-y-6">
@@ -128,11 +183,13 @@ function Calculator() {
               </div>
 
               <div className="pt-6 border-t border-white/5 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Total a receber na conta bancária</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">
+                  Total a receber na conta bancária · {route}
+                </p>
                 <div className="h-24 bg-primary/5 border border-primary/20 rounded-2xl flex items-center px-8 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] -mr-16 -mt-16 rounded-full group-hover:bg-primary/20 transition-all duration-500" />
                   <span className="text-3xl md:text-4xl font-black text-primary relative z-10">
-                    R$ {netValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    R$ {netValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -140,11 +197,15 @@ function Calculator() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
                   <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Taxa Processamento</p>
-                  <p className="text-xs font-bold text-white uppercase">{fees.deposit.percentage}% + R$ {fees.deposit.fixed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs font-bold text-white uppercase">
+                    {fees.deposit.percentage}% + R$ {fees.deposit.fixed.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
                 <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
                   <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Taxa de Saque</p>
-                  <p className="text-xs font-bold text-white uppercase">R$ {fees.withdrawal.fixed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} Fixo</p>
+                  <p className="text-xs font-bold text-white uppercase">
+                    R$ {fees.withdrawal.fixed.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} Fixo
+                  </p>
                 </div>
               </div>
             </div>

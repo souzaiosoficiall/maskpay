@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { fetchPlatformFees } from "./platform-fees.server";
+import { fetchPlatformFees, getUserPaymentRoute } from "./platform-fees.server";
 import { calculateDepositAmounts, calculateWithdrawalAmounts } from "./fees-logic";
 import { callEvoPay } from "./evopay-client.server";
 import { verifyTransactionPin } from "@/lib/utils";
@@ -92,7 +92,7 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const feesResp = await fetchPlatformFees(supabase);
+    const feesResp = await fetchPlatformFees(supabase, await getUserPaymentRoute(supabase, userId));
     const { feeAmount, netAmount } = calculateDepositAmounts(data.amount, feesResp.deposit);
 
     const EVOPAY_API_TOKEN = process.env["EVOPAY_API_TOKEN"];
@@ -125,7 +125,8 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
       if (txError) throw new Error(txError.message);
 
       // Official EvoPay payload (camelCase) — docs.partners.evopay.cash
-      const evoData = await callEvoPay("/pix/", {
+      const paymentRoute = await getUserPaymentRoute(supabase, userId);
+      const evoData = await callEvoPay("/pix/", { route: paymentRoute, 
         method: "POST",
         body: {
           amount: Number(data.amount.toFixed(2)),
@@ -179,7 +180,7 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
       .object({
-        amount: z.number().min(1, "O valor mínimo é R$ 1,00"),
+        amount: z.number().min(10, "O valor mínimo para saque é R$ 10,00"),
         pixKeyType: z.string(),
         pixKey: z.string(),
         transactionPassword: z.string().length(4),
@@ -204,13 +205,18 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .single();
 
-    const feesResp = await fetchPlatformFees(supabase);
+    const feesResp = await fetchPlatformFees(supabase, await getUserPaymentRoute(supabase, userId));
     const { feeAmount, payoutAmount, totalDebit } = calculateWithdrawalAmounts(
       data.amount,
       feesResp.withdrawal
     );
 
     if (payoutAmount <= 0) throw new Error("Valor inválido para saque.");
+
+    // Saque mínimo R$ 10,00 (WHITE e BLACK)
+    if (data.amount < 10) {
+      throw new Error("O valor mínimo para saque é R$ 10,00.");
+    }
 
     if (!wallet || Number(wallet.balance || 0) < totalDebit) {
       throw new Error(
@@ -243,7 +249,8 @@ export const requestPixWithdrawal = createServerFn({ method: "POST" })
 
     try {
       // Recipient receives the FULL requested amount (fee stays with the platform)
-      const evoData = await callEvoPay("/pix/cash-out", {
+      const paymentRoute = await getUserPaymentRoute(supabase, userId);
+      const evoData = await callEvoPay("/pix/cash-out", { route: paymentRoute, 
         method: "POST",
         body: {
           amount: Number(payoutAmount.toFixed(2)),
@@ -374,7 +381,7 @@ export const payPixQrCode = createServerFn({ method: "POST" })
       throw new Error("Informe o valor do pagamento.");
     }
 
-    const feesResp = await fetchPlatformFees(supabase);
+    const feesResp = await fetchPlatformFees(supabase, await getUserPaymentRoute(supabase, userId));
     const feeAmount = Number(feesResp.withdrawal?.fixed ?? 0.8);
     const totalDebit = Math.round((payAmount + feeAmount) * 100) / 100;
 
@@ -419,7 +426,8 @@ export const payPixQrCode = createServerFn({ method: "POST" })
     });
 
     try {
-      const evoData = await callEvoPay("/pix/cash-out", {
+      const paymentRoute = await getUserPaymentRoute(supabase, userId);
+      const evoData = await callEvoPay("/pix/cash-out", { route: paymentRoute, 
         method: "POST",
         body: {
           amount: Number(payAmount.toFixed(2)),

@@ -6,24 +6,46 @@
  * @see https://docs.partners.evopay.cash/pt/guide/authentication
  */
 
+export type EvoPayRoute = 'WHITE' | 'BLACK';
+
 interface ProviderRequestOptions {
   method?: 'GET' | 'POST';
   body?: Record<string, unknown>;
+  /** WHITE → EVOPAY_API_TOKEN | BLACK → EVOPAY_API_TOKEN_BLACK */
+  route?: EvoPayRoute;
+}
+
+function resolveEvoPayToken(route: EvoPayRoute = 'WHITE'): string {
+  if (route === 'BLACK') {
+    const black =
+      process.env['EVOPAY_API_TOKEN_BLACK'] ||
+      process.env['EVOPAY_BLACK_API_TOKEN'];
+    if (!black) {
+      console.error('[Audit] EVOPAY_API_TOKEN_BLACK is NOT configured.');
+      throw new Error(
+        'Configuração de pagamento BLACK ausente (EVOPAY_API_TOKEN_BLACK).',
+      );
+    }
+    return black.trim();
+  }
+  const white = process.env['EVOPAY_API_TOKEN'];
+  if (!white) {
+    console.error('[Audit] EVOPAY_API_TOKEN is NOT configured in the environment.');
+    throw new Error('Configuração de pagamento ausente (Token não encontrado).');
+  }
+  return white.trim();
 }
 
 export async function callEvoPay(endpoint: string, options: ProviderRequestOptions = {}) {
-  const token = process.env['EVOPAY_API_TOKEN'];
-
-  if (!token) {
-    console.error("[Audit] EVOPAY_API_TOKEN is NOT configured in the environment.");
-    throw new Error("Configuração de pagamento ausente (Token não encontrado).");
-  }
+  const route: EvoPayRoute = options.route === 'BLACK' ? 'BLACK' : 'WHITE';
+  const token = resolveEvoPayToken(route);
 
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `https://api.evopay.cash/v1${path}`;
   const method = options.method || 'GET';
 
   console.log(`[Audit] Calling ${method} ${url}`, {
+    route,
     bodyKeys: options.body ? Object.keys(options.body) : [],
   });
 
@@ -35,7 +57,7 @@ export async function callEvoPay(endpoint: string, options: ProviderRequestOptio
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${token.trim()}`,
+        Authorization: `Bearer ${token}`,
       },
     };
 

@@ -10,6 +10,7 @@ const registerSchema = z.object({
   phone: z.string().min(8),
   revenue: z.string().optional(),
   accountType: z.enum(["PF", "PJ"]),
+  accountRoute: z.enum(["WHITE", "BLACK"]).optional(),
 });
 
 export const registerUser = createServerFn({ method: "POST" })
@@ -19,6 +20,7 @@ export const registerUser = createServerFn({ method: "POST" })
     const document = input.document.trim();
     const phone = input.phone.trim();
     const fullName = input.fullName.trim();
+    const accountRoute = input.accountRoute === "BLACK" ? "BLACK" : "WHITE";
     const OWNER_EMAIL = "souzaiosoficial@gmail.com";
     const isOwner = email === OWNER_EMAIL.toLowerCase();
 
@@ -62,7 +64,7 @@ export const registerUser = createServerFn({ method: "POST" })
         kyc_status: isOwner ? "verified" : "unverified",
         verification_status: isOwner ? "verified" : "unverified",
         status: "active",
-        account_route: "WHITE",
+        account_route: accountRoute,
       } as any,
       { onConflict: "id" },
     );
@@ -96,6 +98,7 @@ export const syncProfileAfterSignup = createServerFn({ method: "POST" })
         phone: z.string().min(8),
         revenue: z.string().optional(),
         accountType: z.enum(["PF", "PJ"]).optional(),
+        accountRoute: z.enum(["WHITE", "BLACK"]).optional(),
       })
       .parse(data),
   )
@@ -104,6 +107,7 @@ export const syncProfileAfterSignup = createServerFn({ method: "POST" })
     const fullName = input.fullName.trim();
     const document = input.document.trim();
     const phone = input.phone.trim();
+    const accountRoute = input.accountRoute === "BLACK" ? "BLACK" : "WHITE";
     const OWNER_EMAIL = "souzaiosoficial@gmail.com";
     const isOwner = email === OWNER_EMAIL.toLowerCase();
 
@@ -116,6 +120,7 @@ export const syncProfileAfterSignup = createServerFn({ method: "POST" })
           phone,
           revenue_bracket: input.revenue || null,
           account_type: input.accountType || null,
+          account_route: accountRoute,
         },
       });
     } catch (e) {
@@ -132,7 +137,7 @@ export const syncProfileAfterSignup = createServerFn({ method: "POST" })
         kyc_status: isOwner ? "verified" : "unverified",
         verification_status: isOwner ? "verified" : "unverified",
         status: "active",
-        account_route: "WHITE",
+        account_route: accountRoute,
       } as any,
       { onConflict: "id" },
     );

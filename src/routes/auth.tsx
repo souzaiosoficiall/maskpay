@@ -117,6 +117,7 @@ function AuthPage() {
   const [document, setDocument] = useState('');
   const [phone, setPhone] = useState('');
   const [revenue, setRevenue] = useState('');
+  const [accountRoute, setAccountRoute] = useState<'WHITE' | 'BLACK' | ''>('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -407,8 +408,9 @@ function AuthPage() {
             full_name: fullName.trim(),
             document: document.trim(),
             phone: phone.trim(),
-            revenue_bracket: revenue,
+            revenue_bracket: revenue || null,
             account_type: accountType,
+            account_route: accountRoute || 'WHITE',
           },
         },
       });
@@ -427,6 +429,7 @@ function AuthPage() {
               phone: phone.trim(),
               revenue: revenue || undefined,
               accountType: accountType as 'PF' | 'PJ',
+              accountRoute: (accountRoute || 'WHITE') as 'WHITE' | 'BLACK',
             },
           });
         } catch (syncErr) {
@@ -962,28 +965,53 @@ function AuthPage() {
 
                   {step === 3 && (
                     <div className="space-y-4">
-                      <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 block mb-4">Qual seu faturamento mensal?</Label>
+                      <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 block mb-2">
+                        Qual o risco MED da sua operação?
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground/70 leading-relaxed mb-2">
+                        Isso define a rota de processamento e as taxas da sua conta.
+                      </p>
                       <div className="grid grid-cols-1 gap-3">
-                        {[
-                          { label: 'R$ 1k a R$ 5k', value: '1k-5k' },
-                          { label: 'R$ 10k a R$ 50k', value: '10k-50k' },
-                          { label: 'R$ 100k a R$ 1M', value: '100k-1M' }
-                        ].map((opt) => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setRevenue(opt.value)}
-                            className={cn(
-                              "flex items-center justify-between p-5 rounded-xl border-2 transition-all font-bold text-xs uppercase tracking-widest",
-                              revenue === opt.value 
-                                ? "border-primary bg-primary/5 text-foreground" 
-                                : "border-white/5 bg-white/5 text-muted-foreground hover:border-white/10"
+                        <button
+                          type="button"
+                          onClick={() => setAccountRoute('WHITE')}
+                          className={cn(
+                            "flex flex-col items-start gap-1 p-5 rounded-xl border-2 transition-all text-left",
+                            accountRoute === 'WHITE'
+                              ? "border-primary bg-primary/5 text-foreground"
+                              : "border-white/5 bg-white/5 text-muted-foreground hover:border-white/10"
+                          )}
+                        >
+                          <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                            WHITE — Risco baixo
+                            {accountRoute === 'WHITE' && (
+                              <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
                             )}
-                          >
-                            {opt.label}
-                            {revenue === opt.value && <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_10px_rgba(255,255,255,0.5)]" />}
-                          </button>
-                        ))}
+                          </span>
+                          <span className="text-[10px] font-medium opacity-70">
+                            Operações mais conservadoras. Taxas da rota WHITE.
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAccountRoute('BLACK')}
+                          className={cn(
+                            "flex flex-col items-start gap-1 p-5 rounded-xl border-2 transition-all text-left",
+                            accountRoute === 'BLACK'
+                              ? "border-primary bg-primary/5 text-foreground"
+                              : "border-white/5 bg-white/5 text-muted-foreground hover:border-white/10"
+                          )}
+                        >
+                          <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                            BLACK — Risco alto
+                            {accountRoute === 'BLACK' && (
+                              <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
+                            )}
+                          </span>
+                          <span className="text-[10px] font-medium opacity-70">
+                            Operações de maior risco. Taxas e adquirente da rota BLACK.
+                          </span>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1078,11 +1106,11 @@ function AuthPage() {
                 {!(isForgot && forgotSent) && (
                 <Button 
                   type="submit" 
-                  disabled={isLoading || isValidatingCPF || (step === 4 && !acceptTerms) || (step === 3 && !revenue)}
+                  disabled={isLoading || isValidatingCPF || (step === 4 && !acceptTerms) || (step === 3 && !accountRoute)}
                   className={cn(
                     "bg-white text-black hover:bg-white/90 h-14 rounded-full text-sm font-black transition-all shadow-xl shadow-white/5 flex items-center justify-center gap-2 uppercase tracking-widest",
                     isLogin || isForgot || step === 1 ? "w-full" : "flex-1",
-                    (isLoading || isValidatingCPF || (step === 4 && !acceptTerms) || (step === 3 && !revenue)) && "opacity-50 cursor-not-allowed"
+                    (isLoading || isValidatingCPF || (step === 4 && !acceptTerms) || (step === 3 && !accountRoute)) && "opacity-50 cursor-not-allowed"
                   )}
                 >
                 {isLoading || isValidatingCPF ? (
