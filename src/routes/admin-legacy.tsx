@@ -1,8 +1,8 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
 /**
- * Old /admin path — redirect away so it is not an obvious entry point.
- * Real panel lives at /aylla
+ * /admin e /admin/* não expõem o painel.
+ * Painel real: /aylla e /aylla/login
  */
 export const Route = createFileRoute('/admin')({
   beforeLoad: () => {

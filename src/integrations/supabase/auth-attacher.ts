@@ -4,7 +4,7 @@ import { adminSupabase } from './admin-client'
 
 // Must be registered as a global `functionMiddleware` in `src/start.ts`; otherwise
 // the browser never attaches the bearer token to serverFn RPCs.
-// On /aylla (admin) routes, use the isolated admin session so user tab sessions
+// On /admin (admin) routes, use the isolated admin session so user tab sessions
 // are never overwritten / mixed.
 export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
   async ({ next }) => {
@@ -13,8 +13,8 @@ export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
     const isAdminPanel =
       path === '/aylla' ||
       path.startsWith('/aylla/') ||
-      path === '/admin' ||
-      path.startsWith('/admin/')
+      path === '/aylla' ||
+      path.startsWith('/aylla/')
 
     if (isAdminPanel) {
       const { data } = await adminSupabase.auth.getSession()

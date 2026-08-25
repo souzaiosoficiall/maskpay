@@ -611,6 +611,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
+  AdminLegacyRoute: AdminLegacyRoute,
   AuthRoute: AuthRoute,
   AuthConfirmedRoute: AuthConfirmedRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,

@@ -157,7 +157,7 @@ export default function AdminLayout() {
   const fetchUsers = useServerFn(getAllUsers);
   const [isAdminForce, setIsAdminForce] = useState<boolean | null>(null);
 
-  // Define as as content routes under /aylla use this layout, we can safely use useSearch
+  // Define as as content routes under /admin use this layout, we can safely use useSearch
   const search = useSearch({ from: '/aylla' }) as any;
 
   const isLoginPage = location.pathname.includes('/aylla/login');
