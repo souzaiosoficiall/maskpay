@@ -232,43 +232,94 @@ html, body, #root {
 /* ========== Light theme ========== */
 html.light {
   color-scheme: light;
-  --color-background: oklch(0.97 0 0);
-  --color-foreground: oklch(0.16 0 0);
+  /* Soft zinc workspace — professional fintech light */
+  --color-background: oklch(0.985 0.002 260);
+  --color-foreground: oklch(0.22 0.01 260);
   --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.16 0 0);
+  --color-card-foreground: oklch(0.22 0.01 260);
   --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.16 0 0);
-  --color-primary: oklch(0.16 0 0);
-  --color-primary-foreground: oklch(0.98 0 0);
-  --color-secondary: oklch(0.94 0 0);
-  --color-secondary-foreground: oklch(0.16 0 0);
-  --color-muted: oklch(0.94 0 0);
-  --color-muted-foreground: oklch(0.42 0 0);
-  --color-accent: oklch(0.94 0 0);
-  --color-accent-foreground: oklch(0.16 0 0);
+  --color-popover-foreground: oklch(0.22 0.01 260);
+  --color-primary: oklch(0.22 0.01 260);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-secondary: oklch(0.96 0.004 260);
+  --color-secondary-foreground: oklch(0.22 0.01 260);
+  --color-muted: oklch(0.96 0.004 260);
+  --color-muted-foreground: oklch(0.48 0.01 260);
+  --color-accent: oklch(0.96 0.004 260);
+  --color-accent-foreground: oklch(0.22 0.01 260);
   --color-destructive: oklch(0.55 0.2 25);
-  --color-destructive-foreground: oklch(0.98 0 0);
-  --color-border: oklch(0 0 0 / 10%);
-  --color-input: oklch(0 0 0 / 10%);
-  --color-ring: oklch(0.16 0 0);
+  --color-destructive-foreground: oklch(0.99 0 0);
+  --color-border: oklch(0.90 0.005 260);
+  --color-input: oklch(0.90 0.005 260);
+  --color-ring: oklch(0.22 0.01 260);
 
-  --background: 0 0% 97%;
-  --foreground: 0 0% 9%;
+  --background: 240 5% 98%;
+  --foreground: 240 6% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 9%;
+  --card-foreground: 240 6% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 9%;
-  --primary: 0 0% 9%;
+  --popover-foreground: 240 6% 10%;
+  --primary: 240 6% 10%;
   --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 94%;
-  --secondary-foreground: 0 0% 9%;
-  --muted: 0 0% 94%;
-  --muted-foreground: 0 0% 42%;
-  --accent: 0 0% 94%;
-  --accent-foreground: 0 0% 9%;
-  --border: 0 0% 88%;
-  --input: 0 0% 88%;
-  --ring: 0 0% 9%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 6% 10%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
+  --accent: 240 5% 96%;
+  --accent-foreground: 240 6% 10%;
+  --border: 240 6% 90%;
+  --input: 240 6% 90%;
+  --ring: 240 6% 10%;
+}
+
+/* Sidebar always follows theme tokens */
+html.light .dash-sidebar,
+html.light aside.dash-sidebar {
+  background-color: #ffffff !important;
+  border-color: rgb(24 24 27 / 0.08) !important;
+  color: #18181b !important;
+  box-shadow: 1px 0 0 rgb(24 24 27 / 0.04);
+}
+
+html.dark .dash-sidebar,
+html.dark aside.dash-sidebar {
+  background-color: #080b0f !important;
+  border-color: rgb(255 255 255 / 0.06) !important;
+}
+
+/* Force common hard-coded dark sidebar/page backgrounds into light */
+html.light .bg-\[\#080b0f\],
+html.light .bg-\[\#0c1015\],
+html.light .bg-\[\#0a0e13\],
+html.light .bg-\[\#0c1014\],
+html.light .bg-\[\#12161c\] {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-gradient-to-b.from-white\/\[0\.05\],
+html.light .bg-gradient-to-b.from-white\/\[0\.04\] {
+  background: #ffffff !important;
+}
+
+/* Desktop metric cards in light: clean white surfaces */
+html.light .rounded-2xl.border.border-white\/\[0\.07\] {
+  background: #ffffff !important;
+  border-color: rgb(24 24 27 / 0.08) !important;
+  box-shadow: 0 1px 2px rgb(24 24 27 / 0.04), 0 4px 16px rgb(24 24 27 / 0.03);
+}
+
+html.light .from-white\/\[0\.05\],
+html.light .from-white\/\[0\.04\],
+html.light .to-white\/\[0\.02\],
+html.light .to-transparent {
+  --tw-gradient-from: #ffffff !important;
+  --tw-gradient-to: #ffffff !important;
+}
+
+/* Subtle page canvas */
+html.light body {
+  background-color: #f7f7f8 !important;
+  color: #18181b !important;
 }
 
 /* Map common dark-only utilities so the rest of the app stays readable in light mode */

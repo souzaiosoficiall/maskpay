@@ -100,15 +100,13 @@ export default function DashboardLayout() {
 
   /** Desktop sidebar (kept for large screens) */
   const DesktopNav = () => (
-    <aside className={cn(
-      "hidden lg:flex w-[248px] flex-col border-r shrink-0 transition-colors",
-      isLight
-        ? "border-black/10 bg-zinc-50 text-zinc-900"
-        : "border-white/[0.06] bg-[#080b0f]"
-    )}>
-      <div className={cn("flex h-16 items-center gap-3 border-b px-6", isLight ? "border-black/10" : "border-white/5")}>
+    <aside
+      data-dash-sidebar
+      className="dash-sidebar hidden lg:flex w-[248px] shrink-0 flex-col border-r border-border bg-background text-foreground transition-colors"
+    >
+      <div className="flex h-16 items-center gap-3 border-b border-border px-6">
         <img src={maskPlatformAsset.url} alt="" className="h-8 w-8 object-contain" />
-        <span className={cn("text-base font-semibold tracking-tight", isLight ? "text-zinc-900" : "text-white")}>MaskPay</span>
+        <span className="text-base font-semibold tracking-tight text-foreground">MaskPay</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3 custom-scrollbar">
         <Link
@@ -116,8 +114,8 @@ export default function DashboardLayout() {
           className={cn(
             'flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
             isActive('/dashboard')
-              ? (isLight ? 'border border-black/10 bg-black/[0.04] text-zinc-900' : 'border border-white/10 bg-white/5 text-white')
-              : (isLight ? 'text-zinc-500 hover:bg-black/[0.04] hover:text-zinc-900' : 'text-muted-foreground hover:bg-white/5 hover:text-white'),
+              ? 'dash-nav-active border border-border bg-secondary text-foreground'
+              : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground',
           )}
         >
           <LayoutDashboard className="h-5 w-5" />
@@ -129,9 +127,7 @@ export default function DashboardLayout() {
           onClick={() => canAccess && setIsTransferMenuOpen(!isTransferMenuOpen)}
           className={cn(
             'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
-            isLight
-              ? 'text-zinc-500 hover:bg-black/[0.04] hover:text-zinc-900'
-              : 'text-muted-foreground hover:bg-white/5 hover:text-white',
+            'text-muted-foreground hover:bg-secondary/80 hover:text-foreground',
             !canAccess && 'opacity-50',
           )}
         >
@@ -156,9 +152,7 @@ export default function DashboardLayout() {
                 to={item.to as any}
                 className={cn(
                   'block rounded-lg px-3 py-2 text-[12px] font-medium',
-                  isLight
-                    ? 'text-zinc-500 hover:text-zinc-900'
-                    : 'text-muted-foreground/70 hover:text-white',
+                  'text-muted-foreground hover:text-foreground',
                   !canAccess && 'pointer-events-none opacity-50',
                 )}
               >
@@ -182,8 +176,8 @@ export default function DashboardLayout() {
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
               isActive(item.to)
-                ? (isLight ? 'border border-black/10 bg-black/[0.04] text-zinc-900' : 'border border-white/10 bg-white/5 text-white')
-                : (isLight ? 'text-zinc-500 hover:bg-black/[0.04] hover:text-zinc-900' : 'text-muted-foreground hover:bg-white/5 hover:text-white'),
+                ? 'dash-nav-active border border-border bg-secondary text-foreground'
+                : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground',
               item.to !== '/docs' && item.to !== '/support' && !canAccess && 'pointer-events-none opacity-50',
             )}
           >
@@ -195,7 +189,7 @@ export default function DashboardLayout() {
           </Link>
         ))}
       </nav>
-      <div className={cn("border-t p-4", isLight ? "border-black/10" : "border-white/5")}>
+      <div className="border-t border-border p-4">
         <Button
           variant="ghost"
           className="w-full justify-start rounded-2xl text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
@@ -209,13 +203,13 @@ export default function DashboardLayout() {
   );
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-background text-foreground selection:bg-white/10">
+    <div className="flex h-[100dvh] overflow-hidden bg-background text-foreground selection:bg-primary/10">
       <DesktopNav />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
         {/* Compact top bar (mobile) */}
         <header
-          className="flex shrink-0 items-center justify-between border-b border-white/5 bg-background/95 px-4 backdrop-blur-md lg:hidden"
+          className="flex shrink-0 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur-md lg:hidden"
           style={{
             paddingTop: 'env(safe-area-inset-top, 0px)',
             height: 'calc(3.25rem + env(safe-area-inset-top, 0px))',
