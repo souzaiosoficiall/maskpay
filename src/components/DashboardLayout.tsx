@@ -263,7 +263,7 @@ export default function DashboardLayout() {
                 onClick={() => go('/pay-qr', true)}
                 disabled={!canAccess}
                 className={cn(
-                  'flex h-14 w-14 items-center justify-center rounded-full border-4 border-background bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,0.15)] transition-transform active:scale-95',
+                  'theme-qr-fab flex h-14 w-14 items-center justify-center rounded-full border-4 border-background bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,0.15)] transition-transform active:scale-95',
                   !canAccess && 'opacity-40',
                 )}
                 aria-label="Pagar com QR Code"

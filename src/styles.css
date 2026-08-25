@@ -228,3 +228,141 @@ html, body, #root {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+/* ========== Light theme ========== */
+html.light {
+  color-scheme: light;
+  --color-background: oklch(0.97 0 0);
+  --color-foreground: oklch(0.16 0 0);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.16 0 0);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.16 0 0);
+  --color-primary: oklch(0.16 0 0);
+  --color-primary-foreground: oklch(0.98 0 0);
+  --color-secondary: oklch(0.94 0 0);
+  --color-secondary-foreground: oklch(0.16 0 0);
+  --color-muted: oklch(0.94 0 0);
+  --color-muted-foreground: oklch(0.42 0 0);
+  --color-accent: oklch(0.94 0 0);
+  --color-accent-foreground: oklch(0.16 0 0);
+  --color-destructive: oklch(0.55 0.2 25);
+  --color-destructive-foreground: oklch(0.98 0 0);
+  --color-border: oklch(0 0 0 / 10%);
+  --color-input: oklch(0 0 0 / 10%);
+  --color-ring: oklch(0.16 0 0);
+
+  --background: 0 0% 97%;
+  --foreground: 0 0% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 9%;
+  --primary: 0 0% 9%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 94%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 42%;
+  --accent: 0 0% 94%;
+  --accent-foreground: 0 0% 9%;
+  --border: 0 0% 88%;
+  --input: 0 0% 88%;
+  --ring: 0 0% 9%;
+}
+
+/* Map common dark-only utilities so the rest of the app stays readable in light mode */
+html.light .text-white { color: #18181b !important; }
+html.light .text-white\/40 { color: rgb(24 24 27 / 0.42) !important; }
+html.light .text-white\/45 { color: rgb(24 24 27 / 0.45) !important; }
+html.light .text-white\/50 { color: rgb(24 24 27 / 0.5) !important; }
+html.light .text-white\/55 { color: rgb(24 24 27 / 0.55) !important; }
+html.light .text-white\/60 { color: rgb(24 24 27 / 0.58) !important; }
+html.light .text-white\/65 { color: rgb(24 24 27 / 0.62) !important; }
+html.light .text-white\/70 { color: rgb(24 24 27 / 0.68) !important; }
+html.light .text-white\/80 { color: rgb(24 24 27 / 0.78) !important; }
+html.light .hover\:text-white:hover { color: #09090b !important; }
+html.light .group:hover .group-hover\:text-white { color: #09090b !important; }
+
+html.light .bg-white\/5,
+html.light .bg-white\/\[0\.02\],
+html.light .bg-white\/\[0\.03\],
+html.light .bg-white\/\[0\.04\],
+html.light .bg-white\/\[0\.05\],
+html.light .bg-white\/\[0\.06\] {
+  background-color: rgb(0 0 0 / 0.04) !important;
+}
+html.light .hover\:bg-white\/5:hover,
+html.light .hover\:bg-white\/\[0\.05\]:hover,
+html.light .hover\:bg-white\/\[0\.06\]:hover,
+html.light .hover\:bg-white\/\[0\.04\]:hover,
+html.light .hover\:bg-white\/\[0\.03\]:hover {
+  background-color: rgb(0 0 0 / 0.06) !important;
+}
+
+html.light .border-white\/5 { border-color: rgb(0 0 0 / 0.08) !important; }
+html.light .border-white\/8 { border-color: rgb(0 0 0 / 0.09) !important; }
+html.light .border-white\/10 { border-color: rgb(0 0 0 / 0.1) !important; }
+html.light .border-white\/15 { border-color: rgb(0 0 0 / 0.12) !important; }
+html.light .border-white\/20 { border-color: rgb(0 0 0 / 0.14) !important; }
+
+html.light .bg-\[\#0a0a0a\],
+html.light .bg-\[\#0c0c0c\],
+html.light .bg-\[\#111\],
+html.light .bg-\[\#0c0c0c\]\/95,
+html.light .bg-\[\#0a0a0a\]\/95 {
+  background-color: #f4f4f5 !important;
+}
+
+html.light .bg-black\/70,
+html.light .bg-black\/65 {
+  background-color: rgb(0 0 0 / 0.35) !important;
+}
+
+html.light .bg-black\/5 {
+  background-color: rgb(0 0 0 / 0.05) !important;
+}
+
+/* Keep true solid white buttons readable (primary actions) */
+html.light .bg-white.text-black,
+html.light button.bg-white {
+  background-color: #18181b !important;
+  color: #fafafa !important;
+}
+html.light .bg-white.text-black:hover,
+html.light button.bg-white:hover {
+  background-color: #27272a !important;
+}
+
+/* Balance / hero cards that intentionally invert */
+html.light .theme-hero-card {
+  background: linear-gradient(145deg, #18181b 0%, #27272a 100%) !important;
+  color: #fafafa !important;
+  border-color: rgb(255 255 255 / 0.08) !important;
+}
+html.light .theme-hero-card .text-black\/45,
+html.light .theme-hero-card [class*="text-black"] {
+  color: rgb(255 255 255 / 0.5) !important;
+}
+html.light .theme-hero-card button.bg-black {
+  background-color: #fafafa !important;
+  color: #18181b !important;
+}
+html.light .theme-hero-card button.border-black\/15 {
+  border-color: rgb(255 255 255 / 0.2) !important;
+  color: #fafafa !important;
+}
+
+html.light .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+html.light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* QR center button stays high-contrast */
+html.light .theme-qr-fab {
+  background-color: #18181b !important;
+  color: #fafafa !important;
+  border-color: #f4f4f5 !important;
+}

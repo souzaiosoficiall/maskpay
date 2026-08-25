@@ -11,6 +11,8 @@ import {
   ArrowRightLeft,
   Eye,
   EyeOff,
+  Sun,
+  Moon,
   Fingerprint,
   AlertCircle,
   Clock,
@@ -26,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { useMemo, useState } from 'react';
 import { getTransactionStats, getTransactions } from '@/lib/transactions.functions';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/useTheme';
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: DashboardPage,
@@ -85,6 +88,7 @@ function DashboardPage() {
   });
 
   const [hideValues, setHideValues] = useState(false);
+  const { theme, toggleTheme, isLight } = useTheme();
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -183,14 +187,26 @@ function DashboardPage() {
             {firstName || 'MaskPay'}
           </h1>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setHideValues(!hideValues)}
-          className="h-10 w-10 rounded-full border border-white/10 bg-white/5 text-muted-foreground hover:text-white"
-        >
-          {hideValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            title={isLight ? 'Tema escuro' : 'Tema claro'}
+            className="h-10 w-10 rounded-full border border-white/10 bg-white/5 text-muted-foreground hover:text-white"
+          >
+            {isLight ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setHideValues(!hideValues)}
+            title={hideValues ? 'Mostrar saldo' : 'Ocultar saldo'}
+            className="h-10 w-10 rounded-full border border-white/10 bg-white/5 text-muted-foreground hover:text-white"
+          >
+            {hideValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       {isLoadingProfile && !profile && (
@@ -263,7 +279,7 @@ function DashboardPage() {
       )}
 
       {/* Balance card — hero */}
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-white via-white to-white/85 p-5 text-black shadow-[0_20px_50px_-20px_rgba(255,255,255,0.25)] sm:p-6">
+      <div className="theme-hero-card relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-white via-white to-white/85 p-5 text-black shadow-[0_20px_50px_-20px_rgba(255,255,255,0.25)] sm:p-6">
         <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-black/5" />
         <div className="pointer-events-none absolute -bottom-10 left-1/3 h-24 w-24 rounded-full bg-black/5" />
 
