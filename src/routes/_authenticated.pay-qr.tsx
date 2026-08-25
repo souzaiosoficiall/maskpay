@@ -118,9 +118,12 @@ function PayQrPage() {
         const result = parsePixEmv(text);
         stopCamera();
         setParsed(result);
-        setManualKey(result.pixKey || '');
+        // Always use full PIX copia-e-cola (EMV) in the receiver field — bank-app behavior
+        setManualKey(result.raw || text.trim());
         setAmountOverride(
-          result.amount != null ? String(result.amount).replace('.', ',') : ''
+          result.amount != null && result.amount > 0
+            ? String(result.amount).replace('.', ',')
+            : ''
         );
         setSheetOpen(true);
         toast.success('QR Code lido com sucesso');
@@ -259,7 +262,7 @@ function PayQrPage() {
 
   const openConfirm = () => {
     if (!effectiveKey) {
-      toast.error('Informe a chave PIX do destinatário.');
+      toast.error('Pix Copia e Cola inválido ou vazio.');
       return;
     }
     if (payAmount <= 0) {
@@ -278,13 +281,25 @@ function PayQrPage() {
     if (!effectiveKey || txPass.length !== 4) return;
     setLoading(true);
     try {
+      const emvPayload = effectiveKey.startsWith('0002')
+        ? effectiveKey
+        : (parsed?.raw || effectiveKey);
+      const keyForApi = (() => {
+        if (parsed?.pixKey) return parsed.pixKey;
+        try {
+          const p = parsePixEmv(emvPayload);
+          if (p.pixKey) return p.pixKey;
+        } catch { /* ignore */ }
+        // Fallback: send EMV itself — server will try to resolve
+        return emvPayload;
+      })();
       await doPay({
         data: {
           amount: payAmount,
-          pixKey: effectiveKey,
-          pixKeyType: guessPixKeyType(effectiveKey),
+          pixKey: keyForApi,
+          pixKeyType: guessPixKeyType(keyForApi),
           merchantName: parsed?.merchantName || undefined,
-          emv: parsed?.raw,
+          emv: emvPayload,
           transactionPassword: txPass,
         },
       });
@@ -449,21 +464,18 @@ function PayQrPage() {
 
               <div className="space-y-2">
                 <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                  Chave PIX do recebedor *
+                  Pix Copia e Cola *
                 </Label>
-                <Input
+                <textarea
                   value={manualKey}
                   onChange={(e) => setManualKey(e.target.value)}
-                  placeholder="CPF, CNPJ, e-mail, telefone ou aleatória"
-                  className="bg-white/5 border-white/10 rounded-xl h-12 text-sm font-bold"
-                  autoFocus={!parsed.pixKey}
+                  placeholder="00020126..."
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-[10px] font-mono text-white/90 leading-relaxed resize-none focus:outline-none focus:border-white/25"
                 />
-                {!parsed.pixKey && (
-                  <p className="text-[9px] font-bold text-amber-400/90 leading-relaxed">
-                    Este QR não trouxe a chave embutida (comum em PIX dinâmico). Digite a chave
-                    de quem vai receber para concluir o pagamento.
-                  </p>
-                )}
+                <p className="text-[9px] font-bold text-muted-foreground/70 leading-relaxed">
+                  Código completo do QR (Copia e Cola). Já preenchido automaticamente na leitura.
+                </p>
               </div>
 
               <div className="space-y-2">

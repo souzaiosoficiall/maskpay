@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { fetchPlatformFees } from "./platform-fees.server";
 import { calculateDepositAmounts, calculateWithdrawalAmounts } from "./fees-logic";
 import { callEvoPay } from "./evopay-client.server";
+import { parsePixEmv, guessPixKeyType } from "./pix-emv";
 
 /**
  * Builds the public webhook URL for EvoPay callbacks.
@@ -310,9 +311,55 @@ export const payPixQrCode = createServerFn({ method: "POST" })
       throw new Error("Complete a verificação de identidade para pagar via QR Code.");
     }
 
+    // Resolve PIX key from EMV / copia-e-cola when needed
+    let pixKey = String(data.pixKey || "").trim();
+    let pixKeyType = data.pixKeyType || "random";
+    let payAmount = Number(data.amount);
+    const emv = String(data.emv || "").trim();
+
+    const tryParse = (payload: string) => {
+      try {
+        return parsePixEmv(payload);
+      } catch {
+        return null;
+      }
+    };
+
+    if (emv.startsWith("0002")) {
+      const p = tryParse(emv);
+      if (p?.pixKey) {
+        pixKey = p.pixKey;
+        pixKeyType = guessPixKeyType(p.pixKey);
+      }
+      if ((!payAmount || payAmount <= 0) && p?.amount && p.amount > 0) {
+        payAmount = p.amount;
+      }
+    }
+    if (pixKey.startsWith("0002")) {
+      const p = tryParse(pixKey);
+      if (p?.pixKey) {
+        pixKey = p.pixKey;
+        pixKeyType = guessPixKeyType(p.pixKey);
+      } else {
+        // Dynamic QR without embedded key — cannot cash-out without a real key
+        throw new Error(
+          "Este PIX dinâmico não contém chave do recebedor. Peça um QR estático ou a chave PIX (CPF/e-mail/telefone/aleatória)."
+        );
+      }
+      if ((!payAmount || payAmount <= 0) && p?.amount && p.amount > 0) {
+        payAmount = p.amount;
+      }
+    }
+
+    if (!pixKey) {
+      throw new Error("Chave PIX não encontrada no código.");
+    }
+    if (!payAmount || payAmount <= 0) {
+      throw new Error("Informe o valor do pagamento.");
+    }
+
     const feesResp = await fetchPlatformFees(supabase);
     const feeAmount = Number(feesResp.withdrawal?.fixed ?? 0.8);
-    const payAmount = Number(data.amount);
     const totalDebit = Math.round((payAmount + feeAmount) * 100) / 100;
 
     const { data: wallet } = await supabase
@@ -337,10 +384,10 @@ export const payPixQrCode = createServerFn({ method: "POST" })
         status: "pending",
         description: `Pagamento PIX QR${data.merchantName ? ` — ${data.merchantName}` : ""}`,
         metadata: {
-          pix_key: data.pixKey,
-          pix_key_type: data.pixKeyType || "random",
+          pix_key: pixKey,
+          pix_key_type: pixKeyType,
           merchant_name: data.merchantName || null,
-          emv: data.emv || null,
+          emv: emv || data.emv || null,
           pay_amount: payAmount,
         },
       })
@@ -360,8 +407,8 @@ export const payPixQrCode = createServerFn({ method: "POST" })
         method: "POST",
         body: {
           amount: Number(payAmount.toFixed(2)),
-          pixKey: data.pixKey,
-          pixKeyType: data.pixKeyType || "random",
+          pixKey,
+          pixKeyType,
           clientReference: String(tx.id),
           callbackUrl: getWebhookUrl(),
         },
