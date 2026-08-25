@@ -278,6 +278,35 @@ function AuthenticatedLayout() {
     }
   }, [profile, isProfileLoading, sessionReady, location.pathname, navigate, forceOut]);
 
+  // PIN obrigatório assim que entra (antes dos documentos / liberação)
+  // IMPORTANT: computed before any early return (Rules of Hooks)
+  const needsPinSetup =
+    !!profile &&
+    profile.role !== 'admin' &&
+    !profile.transaction_password_hash;
+
+  // Após criar o PIN, se ainda não enviou KYC, manda para /verify
+  useEffect(() => {
+    if (!sessionReady || !authValidated) return;
+    if (!profile || profile.role === 'admin') return;
+    if (!profile.transaction_password_hash) return; // ainda no modal do PIN
+
+    const status = profile.verification_status;
+    const needsDocs =
+      !status ||
+      status === 'unverified' ||
+      status === '' ||
+      status === null;
+
+    if (!needsDocs) return;
+
+    const path = location.pathname;
+    if (path === '/verify' || path.startsWith('/verify/')) return;
+    if (path === '/support' || path.startsWith('/support/')) return;
+
+    navigate({ to: '/verify', replace: true });
+  }, [sessionReady, authValidated, profile, location.pathname, navigate]);
+
   // Wait for server-side auth validation (blocks Face ID on deleted accounts)
   if (sessionReady && !authValidated) {
     return (
@@ -296,34 +325,6 @@ function AuthenticatedLayout() {
   if (sessionReady && authValidated && !unlocked) {
     return <AppLockScreen onUnlocked={handleUnlocked} />;
   }
-
-  // PIN obrigatório assim que entra (antes dos documentos / liberação)
-  const needsPinSetup =
-    !!profile &&
-    profile.role !== 'admin' &&
-    !profile.transaction_password_hash;
-
-  // Após criar o PIN, se ainda não enviou KYC, manda para /verify
-  useEffect(() => {
-    if (!profile || profile.role === 'admin') return;
-    if (!profile.transaction_password_hash) return; // ainda no modal do PIN
-    if (needsPinSetup) return;
-
-    const status = profile.verification_status;
-    const needsDocs =
-      !status ||
-      status === 'unverified' ||
-      status === '' ||
-      status === null;
-
-    if (!needsDocs) return;
-
-    const path = location.pathname;
-    if (path === '/verify' || path.startsWith('/verify/')) return;
-    if (path === '/support' || path.startsWith('/support/')) return;
-
-    navigate({ to: '/verify', replace: true });
-  }, [profile, needsPinSetup, location.pathname, navigate]);
 
   return (
     <>
