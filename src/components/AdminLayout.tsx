@@ -8,7 +8,7 @@ import { getAllUsers } from '@/lib/admin-system.functions';
 import { useSessionReady } from '@/hooks/useSessionReady';
 import { getInitials, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { adminSupabase as supabase } from '@/integrations/supabase/admin-client';
 import { checkAdminRole } from '@/lib/admin-auth.functions';
 import { 
   LogOut,
@@ -30,7 +30,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="flex items-center px-6 border-b border-white/5 shrink-0 h-14 md:h-16">
-        <Link to="/admin" className="flex items-center gap-3 overflow-hidden">
+        <Link to="/aylla" className="flex items-center gap-3 overflow-hidden">
           <img src={maskPlatformAsset.url} alt="MaskPay Admin" className={cn("object-contain transition-all", (isSidebarOpen || isMobile) ? "w-8 h-8 min-w-8" : "w-6 h-6 min-w-6")} />
           {(isSidebarOpen || isMobile) && (
             <span className="text-xl font-black tracking-tighter uppercase whitespace-nowrap flex items-center gap-2">
@@ -46,7 +46,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
         </div>
         
         <Link
-          to="/admin"
+          to="/aylla"
           activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
           inactiveProps={{ className: "bg-background border-transparent" }}
           className="flex items-center gap-3 px-4 py-3 rounded-2xl text-muted-foreground hover:bg-white/5 hover:text-white transition-all group mb-1 border relative"
@@ -56,7 +56,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
         </Link>
 
         <Link
-          to="/admin"
+          to="/aylla"
           search={{ tab: 'users' }}
           activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
           inactiveProps={{ className: "bg-background border-transparent" }}
@@ -67,7 +67,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
         </Link>
 
         <Link
-          to="/admin"
+          to="/aylla"
           search={{ tab: 'kyc' }}
           activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
           inactiveProps={{ className: "bg-background border-transparent" }}
@@ -81,7 +81,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
         </Link>
 
         <Link
-          to="/admin"
+          to="/aylla"
           search={{ tab: 'tickets' }}
           activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
           inactiveProps={{ className: "bg-background border-transparent" }}
@@ -95,7 +95,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
         </Link>
 
         <Link
-          to="/admin"
+          to="/aylla"
           search={{ tab: 'logs' }}
           activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
           inactiveProps={{ className: "bg-background border-transparent" }}
@@ -106,7 +106,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
         </Link>
 
         <Link
-          to="/admin"
+          to="/aylla"
           search={{ tab: 'settings' }}
           activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
           inactiveProps={{ className: "bg-background border-transparent" }}
@@ -117,7 +117,7 @@ function SidebarContent({ isMobile = false, isSidebarOpen, hasPendingKyc, hasOpe
         </Link>
 
         <Link
-          to="/admin"
+          to="/aylla"
           search={{ tab: 'notifications' }}
           activeProps={{ className: "text-white bg-white/5 border border-white/10 shadow-none" }}
           inactiveProps={{ className: "bg-background border-transparent" }}
@@ -157,10 +157,10 @@ export default function AdminLayout() {
   const fetchUsers = useServerFn(getAllUsers);
   const [isAdminForce, setIsAdminForce] = useState<boolean | null>(null);
 
-  // Define as as content routes under /admin use this layout, we can safely use useSearch
-  const search = useSearch({ from: '/admin' }) as any;
+  // Define as as content routes under /aylla use this layout, we can safely use useSearch
+  const search = useSearch({ from: '/aylla' }) as any;
 
-  const isLoginPage = location.pathname.includes('/admin/login');
+  const isLoginPage = location.pathname.includes('/aylla/login');
   const OWNER_EMAIL = 'souzaiosoficial@gmail.com';
   const cleanOwnerEmail = OWNER_EMAIL.toLowerCase().trim();
 
@@ -236,8 +236,8 @@ export default function AdminLayout() {
       if (!session?.user) {
         console.log("AdminLayout: Nenhuma sessão encontrada");
         setIsAdminForce(false);
-        if (!window.location.pathname.includes('/admin/login')) {
-          window.location.href = '/admin/login';
+        if (!window.location.pathname.includes('/aylla/login')) {
+          window.location.href = '/aylla/login';
         }
         return;
       }
@@ -255,7 +255,7 @@ export default function AdminLayout() {
           console.log("AdminLayout: Usuário logado mas não é admin");
           await supabase.auth.signOut();
           setIsAdminForce(false);
-          window.location.href = '/admin/login';
+          window.location.href = '/aylla/login';
         } else {
           setIsAdminForce(true);
         }
@@ -267,7 +267,7 @@ export default function AdminLayout() {
           setIsAdminForce(true);
         } else {
           setIsAdminForce(false);
-          window.location.href = '/admin/login';
+          window.location.href = '/aylla/login';
         }
       }
     };
@@ -277,7 +277,7 @@ export default function AdminLayout() {
   const handleLogout = async () => {
     localStorage.removeItem('maskpay_admin_bypass_session');
     await supabase.auth.signOut();
-    window.location.href = '/admin/login';
+    window.location.href = '/aylla/login';
   };
 
   if (isLoginPage) {

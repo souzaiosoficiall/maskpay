@@ -84,6 +84,7 @@
   .safe-pt { padding-top: env(safe-area-inset-top); }
   .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
 
+  #maskpay-badge,
   #lovable-badge {
     display: none !important;
   }

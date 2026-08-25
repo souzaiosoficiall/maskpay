@@ -2,7 +2,7 @@
 export async function authenticateCronRequest(
   request: Request,
 ): Promise<Response | null> {
-  const currentSecret = process.env['MASKPAY_CRON_SECRET'] || process.env['LOVABLE_CRON_SECRET']
+  const currentSecret = process.env['MASKPAY_CRON_SECRET'] || process.env['LOVABLE_CRON_SECRET'] /* legacy alias */
   const previousSecret = process.env['MASKPAY_CRON_SECRET_PREVIOUS'] || process.env['LOVABLE_CRON_SECRET_PREVIOUS']
 
   if (!currentSecret) {

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AdminLegacyRouteImport } from './routes/admin-legacy'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthConfirmedRouteImport } from './routes/auth.confirmed'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
@@ -48,6 +49,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
+  id: '/aylla',
+  path: '/aylla',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLegacyRoute = AdminLegacyRouteImport.update({
   id: '/admin',
   path: '/admin',
   getParentRoute: () => rootRouteImport,
@@ -181,7 +187,7 @@ const ApiPublicPaymentWebhookRoute = ApiPublicPaymentWebhookRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/aylla': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/auth/confirmed': typeof AuthConfirmedRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
@@ -200,10 +206,10 @@ export interface FileRoutesByFullPath {
   '/webhooks': typeof AuthenticatedWebhooksRoute
   '/withdraw': typeof AuthenticatedWithdrawRoute
   '/pay-qr': typeof AuthenticatedPayQrRoute
-  '/admin/login': typeof AdminLoginRoute
+  '/aylla/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
-  '/admin/': typeof AdminIndexRoute
+  '/aylla/': typeof AdminIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
@@ -228,10 +234,10 @@ export interface FileRoutesByTo {
   '/webhooks': typeof AuthenticatedWebhooksRoute
   '/withdraw': typeof AuthenticatedWithdrawRoute
   '/pay-qr': typeof AuthenticatedPayQrRoute
-  '/admin/login': typeof AdminLoginRoute
+  '/aylla/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
-  '/admin': typeof AdminIndexRoute
+  '/aylla': typeof AdminIndexRoute
   '/blog': typeof BlogIndexRoute
   '/docs': typeof DocsIndexRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
@@ -240,7 +246,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/admin': typeof AdminRouteWithChildren
+  '/aylla': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/api-keys': typeof AuthenticatedApiKeysRoute
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
@@ -257,10 +263,10 @@ export interface FileRoutesById {
   '/_authenticated/webhooks': typeof AuthenticatedWebhooksRoute
   '/_authenticated/withdraw': typeof AuthenticatedWithdrawRoute
   '/_authenticated/pay-qr': typeof AuthenticatedPayQrRoute
-  '/admin/login': typeof AdminLoginRoute
+  '/aylla/login': typeof AdminLoginRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
-  '/admin/': typeof AdminIndexRoute
+  '/aylla/': typeof AdminIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
@@ -269,7 +275,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/admin'
+    | '/aylla'
     | '/auth'
     | '/api-keys'
     | '/customers'
@@ -286,10 +292,10 @@ export interface FileRouteTypes {
     | '/webhooks'
     | '/withdraw'
     | '/pay-qr'
-    | '/admin/login'
+    | '/aylla/login'
     | '/legal/privacy'
     | '/legal/terms'
-    | '/admin/'
+    | '/aylla/'
     | '/blog/'
     | '/docs/'
     | '/api/public/payment-webhook'
@@ -312,10 +318,10 @@ export interface FileRouteTypes {
     | '/webhooks'
     | '/withdraw'
     | '/pay-qr'
-    | '/admin/login'
+    | '/aylla/login'
     | '/legal/privacy'
     | '/legal/terms'
-    | '/admin'
+    | '/aylla'
     | '/blog'
     | '/docs'
     | '/api/public/payment-webhook'
@@ -323,7 +329,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
-    | '/admin'
+    | '/aylla'
     | '/auth'
     | '/_authenticated/api-keys'
     | '/_authenticated/customers'
@@ -339,10 +345,10 @@ export interface FileRouteTypes {
     | '/_authenticated/wallet'
     | '/_authenticated/webhooks'
     | '/_authenticated/withdraw'
-    | '/admin/login'
+    | '/aylla/login'
     | '/legal/privacy'
     | '/legal/terms'
-    | '/admin/'
+    | '/aylla/'
     | '/blog/'
     | '/docs/'
     | '/api/public/payment-webhook'
@@ -378,10 +384,10 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
+    '/aylla': {
+      id: '/aylla'
+      path: '/aylla'
+      fullPath: '/aylla'
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -497,17 +503,17 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPayQrRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/admin/': {
-      id: '/admin/'
+    '/aylla/': {
+      id: '/aylla/'
       path: '/'
-      fullPath: '/admin/'
+      fullPath: '/aylla/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/login': {
-      id: '/admin/login'
+    '/aylla/login': {
+      id: '/aylla/login'
       path: '/login'
-      fullPath: '/admin/login'
+      fullPath: '/aylla/login'
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof AdminRoute
     }

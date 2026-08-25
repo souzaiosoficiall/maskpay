@@ -1,10 +1,10 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 import AdminLayout from '@/components/AdminLayout';
-import { supabase } from '@/integrations/supabase/client';
+import { adminSupabase as supabase } from '@/integrations/supabase/admin-client';
 
-export const Route = createFileRoute('/admin')({
+export const Route = createFileRoute('/aylla')({
   beforeLoad: async ({ location }) => {
-    if (location.pathname === '/admin/login') return;
+    if (location.pathname === '/aylla/login') return;
     
     if (typeof window !== 'undefined') {
       const { data: { session } } = await supabase.auth.getSession();
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/admin')({
 
       if (!session && !isOwner) {
         console.log("AdminRoute: Sem sessão, redirecionando para login");
-        throw redirect({ to: '/admin/login' });
+        throw redirect({ to: '/aylla/login' });
       }
     }
   },

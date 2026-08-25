@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
-import { supabase } from '@/integrations/supabase/client';
+import { adminSupabase as supabase } from '@/integrations/supabase/admin-client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 import { adminLoginBypass, checkAdminRole } from '@/lib/admin-auth.functions';
 import maskPlatformAsset from "@/lib/mask-asset";
 
-export const Route = createFileRoute('/admin/login')({
+export const Route = createFileRoute('/aylla/login')({
   component: AdminLoginPage,
 });
 
@@ -62,8 +62,8 @@ function AdminLoginPage() {
         await queryClient.resetQueries({ queryKey: ['admin_users'] });
         await queryClient.resetQueries({ queryKey: ['profile'] });
         
-        console.log("Redirecionando para /admin...");
-        window.location.href = '/admin';
+        console.log("Redirecionando para /aylla...");
+        window.location.href = '/aylla';
         return;
       }
 
@@ -106,8 +106,8 @@ function AdminLoginPage() {
       await queryClient.resetQueries({ queryKey: ['admin_users'] });
       await queryClient.resetQueries({ queryKey: ['profile'] });
       
-      console.log("Redirecionando para /admin (via bypass)...");
-      window.location.href = '/admin';
+      console.log("Redirecionando para /aylla (via bypass)...");
+      window.location.href = '/aylla';
 
     } catch (err: any) {
       console.error("Erro no login:", err);

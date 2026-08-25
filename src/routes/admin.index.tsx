@@ -36,7 +36,7 @@ import { SupportCenter } from '@/components/admin/SupportCenter';
 import { PlatformSettings } from '@/components/admin/PlatformSettings';
 import { NotificationManagement } from '@/components/admin/NotificationManagement';
 
-export const Route = createFileRoute('/admin/')({
+export const Route = createFileRoute('/aylla/')({
   component: AdminPage,
 });
 
@@ -60,7 +60,7 @@ function AdminPage() {
 
 
   const navigate = useNavigate();
-  const search = useSearch({ from: '/admin/' }) as any;
+  const search = useSearch({ from: '/aylla/' }) as any;
   const initialTab = search.tab || 'dashboard';
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'tickets' | 'kyc' | 'logs' | 'settings' | 'notifications'>(initialTab);
