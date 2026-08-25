@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Bell, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -13,8 +11,8 @@ interface NotificationModalProps {
 }
 
 /**
- * System announcement panel — slides up from the bottom, straight edges,
- * readable scroll for long messages.
+ * Centered system announcement — soft rounded card, subject on top,
+ * message below, round toggle for "don't show again".
  */
 export function NotificationModal({
   isOpen,
@@ -30,7 +28,6 @@ export function NotificationModal({
     setMounted(true);
   }, []);
 
-  // Enter / exit animation
   useEffect(() => {
     if (isOpen) {
       setDontShowAgain(false);
@@ -40,7 +37,6 @@ export function NotificationModal({
     setVisible(false);
   }, [isOpen]);
 
-  // Lock body scroll while open
   useEffect(() => {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
@@ -55,107 +51,106 @@ export function NotificationModal({
   const handleDismiss = () => onClose(dontShowAgain);
 
   const panel = (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
       <button
         type="button"
         aria-label="Fechar aviso"
         className={cn(
-          'absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity duration-300',
+          'absolute inset-0 bg-black/65 backdrop-blur-sm transition-opacity duration-300',
           visible ? 'opacity-100' : 'opacity-0',
         )}
         onClick={handleDismiss}
       />
 
-      {/* Panel — full width on mobile bottom sheet, centered card on desktop */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="sys-notif-title"
         className={cn(
-          'relative z-10 flex w-full max-w-lg flex-col border border-white/10 bg-[#0c0c0c] shadow-2xl',
-          // Straight edges (slight radius only on top corners for mobile sheet)
-          'rounded-none sm:rounded-sm',
-          'max-h-[min(88vh,640px)]',
+          'relative z-10 flex w-full max-w-[400px] flex-col overflow-hidden',
+          'rounded-[1.75rem] border border-white/10 bg-[#111] shadow-2xl',
+          'max-h-[min(82vh,560px)]',
           'transition-all duration-300 ease-out',
           visible
-            ? 'translate-y-0 opacity-100'
-            : 'translate-y-full opacity-0 sm:translate-y-8',
+            ? 'translate-y-0 scale-100 opacity-100'
+            : 'translate-y-4 scale-95 opacity-0',
         )}
       >
-        {/* Top accent line */}
-        <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/[0.06] to-transparent" />
 
-        {/* Header */}
-        <div className="flex shrink-0 items-start gap-3 border-b border-white/10 px-5 py-4 sm:px-6">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-white/15 bg-white text-black">
+        <div className="relative flex shrink-0 items-center gap-3 px-5 pb-3 pt-5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-md">
             <Bell className="h-4 w-4" strokeWidth={2.25} />
           </div>
-          <div className="min-w-0 flex-1 pt-0.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/45">
-              Comunicado oficial
-            </p>
-            <h2
-              id="sys-notif-title"
-              className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg"
-            >
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
               Aviso do sistema
-            </h2>
+            </p>
+            <p className="text-[11px] font-medium text-white/55">Comunicado oficial</p>
           </div>
           <button
             type="button"
             onClick={handleDismiss}
-            className="flex h-9 w-9 shrink-0 items-center justify-center border border-white/10 text-white/50 transition-colors hover:border-white/25 hover:bg-white/5 hover:text-white"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white"
             aria-label="Fechar"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Body — scrollable for long content */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 custom-scrollbar">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-white sm:text-[15px]">
+        <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-2 custom-scrollbar">
+          <h2
+            id="sys-notif-title"
+            className="text-lg font-bold leading-snug tracking-tight text-white sm:text-xl"
+          >
             {title}
-          </h3>
-          <div className="mt-3 space-y-3 border-l-2 border-white/20 pl-4 text-[13px] leading-relaxed text-white/70 sm:text-sm">
+          </h2>
+
+          <div className="mt-3 space-y-2.5 text-[13px] leading-relaxed text-white/65 sm:text-sm">
             {(description || '')
               .split('\n')
-              .filter((line) => line.length > 0 || description.includes('\n\n'))
               .map((line, i) => (
-                <p key={i} className={line.trim() === '' ? 'h-2' : 'break-words'}>
+                <p key={i} className="break-words">
                   {line.trim() === '' ? '\u00A0' : line}
                 </p>
               ))}
             {!description?.trim() && (
-              <p className="text-white/40 italic">Sem mensagem adicional.</p>
+              <p className="italic text-white/35">Sem mensagem adicional.</p>
             )}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="shrink-0 space-y-3 border-t border-white/10 px-5 py-4 sm:px-6">
-          <label
-            htmlFor="dontShowAgain"
-            className="flex cursor-pointer items-center gap-3 border border-white/10 bg-white/[0.02] px-3 py-3 transition-colors hover:bg-white/[0.04]"
+        <div className="relative shrink-0 space-y-3 border-t border-white/8 px-5 pb-5 pt-4">
+          <button
+            type="button"
+            onClick={() => setDontShowAgain((v) => !v)}
+            className="flex w-full items-center gap-3 rounded-2xl px-1 py-1 text-left transition-colors hover:bg-white/[0.03]"
           >
-            <Checkbox
-              id="dontShowAgain"
-              checked={dontShowAgain}
-              onCheckedChange={(checked) => setDontShowAgain(!!checked)}
-              className="h-4 w-4 rounded-none border-white/30 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-black"
-            />
-            <span className="text-[11px] font-medium uppercase tracking-wider text-white/55">
+            <span
+              className={cn(
+                'relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200',
+                dontShowAgain
+                  ? 'border-white bg-white'
+                  : 'border-white/30 bg-transparent',
+              )}
+              aria-hidden
+            >
+              {dontShowAgain && (
+                <span className="h-2.5 w-2.5 rounded-full bg-black" />
+              )}
+            </span>
+            <span className="text-[12px] font-medium text-white/60">
               Não mostrar este aviso novamente
             </span>
-          </label>
+          </button>
 
-          <Button
+          <button
             type="button"
             onClick={handleDismiss}
-            className="h-11 w-full rounded-none bg-white text-[11px] font-bold uppercase tracking-[0.18em] text-black hover:bg-white/90"
+            className="flex h-12 w-full items-center justify-center rounded-full bg-white text-[12px] font-bold uppercase tracking-[0.14em] text-black transition-transform active:scale-[0.98] hover:bg-white/90"
           >
             Entendi
-          </Button>
+          </button>
         </div>
       </div>
     </div>
