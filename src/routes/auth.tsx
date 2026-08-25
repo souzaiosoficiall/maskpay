@@ -14,7 +14,7 @@ import maskPlatformAsset from "@/lib/mask-asset";
 import { AuthVisualPanel } from '@/components/AuthVisualPanel';
 import { useServerFn } from '@tanstack/react-start';
 import { validateCPFAction } from '@/lib/identity.functions';
-import { registerUser } from '@/lib/register.functions';
+import { syncProfileAfterSignup, checkRegistrationAvailability } from '@/lib/register.functions';
 
 
 export const Route = createFileRoute('/auth')({
@@ -69,9 +69,12 @@ function AuthPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const validateCPFServer = useServerFn(validateCPFAction);
-  const registerUserServer = useServerFn(registerUser);
+  const syncProfileServer = useServerFn(syncProfileAfterSignup);
+  const checkAvailabilityServer = useServerFn(checkRegistrationAvailability);
   const [isValidatingCPF, setIsValidatingCPF] = useState(false);
   const [isCPFVerified, setIsCPFVerified] = useState(false);
+  /** Seconds left before resend confirmation email is allowed (0 = free to resend) */
+  const [resendCooldown, setResendCooldown] = useState(0);
 
 
   const maskPhone = (value: string) => {
@@ -254,30 +257,84 @@ function AuthPage() {
         return;
       }
 
-      // Registration via server (service role) so profile always gets full_name/document/phone
-      await registerUserServer({
+      // Pre-check duplicates server-side
+      await checkAvailabilityServer({
         data: {
           email: email.trim(),
-          password,
-          fullName: fullName.trim(),
           document: document.trim(),
           phone: phone.trim(),
-          revenue: revenue || undefined,
-          accountType: accountType as 'PF' | 'PJ',
         },
       });
 
-      // registerUser confirms the Auth user; send user to login
-      try {
-        await supabase.auth.signOut({ scope: 'local' });
-      } catch {
-        // ignore
+      // Client signUp so Supabase sends the confirmation email (like before)
+      const siteUrl =
+        (typeof window !== 'undefined' ? window.location.origin : '') ||
+        'https://pagamentosonaseguro.online';
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: `${siteUrl}/auth/confirmed`,
+          data: {
+            full_name: fullName.trim(),
+            document: document.trim(),
+            phone: phone.trim(),
+            revenue_bracket: revenue,
+            account_type: accountType,
+          },
+        },
+      });
+
+      if (signUpError) throw signUpError;
+
+      if (signUpData.user) {
+        // Persist profile with service role (name / CPF / phone always saved)
+        try {
+          await syncProfileServer({
+            data: {
+              userId: signUpData.user.id,
+              email: email.trim(),
+              fullName: fullName.trim(),
+              document: document.trim(),
+              phone: phone.trim(),
+              revenue: revenue || undefined,
+              accountType: accountType as 'PF' | 'PJ',
+            },
+          });
+        } catch (syncErr) {
+          console.error('[auth] syncProfileAfterSignup failed:', syncErr);
+        }
+
+        const hasSession = !!signUpData.session?.access_token;
+        const emailConfirmed = !!(signUpData.user as any).email_confirmed_at;
+
+        if (!hasSession || !emailConfirmed) {
+          try {
+            await supabase.auth.signOut({ scope: 'local' });
+          } catch {
+            // ignore
+          }
+          setPendingConfirmEmail(email.trim());
+          setAwaitingEmailConfirm(true);
+          setResendCooldown(60);
+          toast.success('Conta criada! Verifique seu e-mail para confirmar.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Email already confirmed (confirm-email disabled in Supabase) → enter app
+        toast.success('Conta criada com sucesso!');
+        try {
+          sessionStorage.setItem('maskpay-app-unlocked', '1');
+        } catch {
+          // ignore
+        }
+        clearSecurityLock();
+        window.localStorage.setItem('maskpay-login-timestamp', Date.now().toString());
+        window.location.href = '/dashboard';
+        return;
       }
-      setPendingConfirmEmail(email.trim());
-      setAwaitingEmailConfirm(true);
-      toast.success('Conta criada! Você já pode fazer login com seu e-mail e senha.');
-      setIsLoading(false);
-      return;
     } catch (err: any) {
       setError(err.message || 'Erro ao processar solicitação');
     } finally {
@@ -285,8 +342,17 @@ function AuthPage() {
     }
   };
 
+  // Countdown for resend confirmation email (1 minute)
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = window.setInterval(() => {
+      setResendCooldown((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [resendCooldown]);
+
   const resendConfirmationEmail = async () => {
-    if (!pendingConfirmEmail) return;
+    if (!pendingConfirmEmail || resendCooldown > 0) return;
     setIsLoading(true);
     setError('');
     try {
@@ -299,6 +365,7 @@ function AuthPage() {
         options: { emailRedirectTo: `${siteUrl}/auth/confirmed` },
       });
       if (resendError) throw resendError;
+      setResendCooldown(60);
       toast.success('E-mail de confirmação reenviado. Confira também a pasta de spam.');
     } catch (err: any) {
       setError(err?.message || 'Não foi possível reenviar o e-mail.');
@@ -361,20 +428,38 @@ function AuthPage() {
                 <p className="text-xs font-bold text-red-400 text-center">{error}</p>
               )}
 
-              <Button
-                type="button"
-                onClick={resendConfirmationEmail}
-                disabled={isLoading}
-                className="w-full h-12 rounded-xl bg-white text-black font-black uppercase tracking-widest text-xs"
-              >
-                {isLoading ? <Loader2 className="animate-spin" /> : 'Reenviar e-mail'}
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  onClick={resendConfirmationEmail}
+                  disabled={isLoading || resendCooldown > 0}
+                  className="w-full h-12 rounded-xl bg-white text-black font-black uppercase tracking-widest text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <Loader2 className="animate-spin" />
+                  ) : resendCooldown > 0 ? (
+                    `Aguarde ${resendCooldown}s`
+                  ) : (
+                    'Reenviar e-mail'
+                  )}
+                </Button>
+                {resendCooldown > 0 && (
+                  <p className="text-center text-[11px] font-medium text-muted-foreground">
+                    Você poderá reenviar o e-mail em{' '}
+                    <span className="font-black text-foreground tabular-nums">
+                      {String(Math.floor(resendCooldown / 60)).padStart(1, '0')}:
+                      {String(resendCooldown % 60).padStart(2, '0')}
+                    </span>
+                  </p>
+                )}
+              </div>
 
               <button
                 type="button"
                 onClick={() => {
                   setAwaitingEmailConfirm(false);
                   setPendingConfirmEmail('');
+                  setResendCooldown(0);
                   setError('');
                   navigate({ to: '/auth', search: { mode: 'login' } });
                 }}
