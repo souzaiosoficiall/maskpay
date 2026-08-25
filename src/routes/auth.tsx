@@ -56,34 +56,50 @@ function AuthPage() {
       return false;
     };
 
-    // Recovery link landed on /auth → send to dedicated page (keep query/hash)
-    if (isRecoveryUrl() && !window.location.pathname.includes('reset-password')) {
-      const q = window.location.search || '';
-      const h = window.location.hash || '';
-      window.location.replace(`/auth/reset-password${q}${h}`);
-      return;
+    // Recovery → show form on this page (don't bounce to login UX)
+    const activateRecovery = async () => {
+      try {
+        sessionStorage.setItem('maskpay-password-recovery', '1');
+      } catch {
+        // ignore
+      }
+      // Exchange PKCE code if present on /auth
+      try {
+        const u = new URL(window.location.href);
+        const code = u.searchParams.get('code');
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+        }
+      } catch (e) {
+        console.error('[auth recovery exchange]', e);
+      }
+      if (!cancelled) setRecoveryActive(true);
+    };
+
+    if (isRecoveryUrl()) {
+      void activateRecovery();
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        try {
-          sessionStorage.setItem('maskpay-password-recovery', '1');
-        } catch {
-          // ignore
-        }
-        if (!window.location.pathname.includes('reset-password')) {
-          window.location.replace('/auth/reset-password');
-        }
+        void activateRecovery();
+        return;
+      }
+      // If session appears with recovery flag, stay on form
+      if (session && sessionStorage.getItem('maskpay-password-recovery') === '1') {
+        if (!cancelled) setRecoveryActive(true);
       }
     });
 
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
+      if (sessionStorage.getItem('maskpay-password-recovery') === '1') {
+        setRecoveryActive(true);
+        return;
+      }
       if (!data.session?.access_token) return;
       if (isRecoveryUrl()) {
-        if (!window.location.pathname.includes('reset-password')) {
-          window.location.replace('/auth/reset-password');
-        }
+        setRecoveryActive(true);
         return;
       }
       window.location.href = '/dashboard';
@@ -123,6 +139,11 @@ function AuthPage() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotResendCountdown, setForgotResendCountdown] = useState(0);
+  const [recoveryActive, setRecoveryActive] = useState(false);
+  const [recoveryPw, setRecoveryPw] = useState('');
+  const [recoveryPw2, setRecoveryPw2] = useState('');
+  const [recoverySaving, setRecoverySaving] = useState(false);
+  const [showRecoveryPw, setShowRecoveryPw] = useState(false);
 
   useEffect(() => {
     setForgotSent(false);
@@ -480,6 +501,106 @@ function AuthPage() {
       setIsLoading(false);
     }
   };
+
+  // ——— Password recovery (link do e-mail caiu no /auth) ———
+  if (recoveryActive) {
+    return (
+      <div className="min-h-screen flex w-full items-center justify-center bg-background px-4 py-10 font-sans text-foreground">
+        <div className="w-full max-w-md space-y-8">
+          <div className="flex flex-col items-center text-center">
+            <div className="flex items-center gap-3 mb-6">
+              <img src={maskPlatformAsset.url} alt="MaskPay" className="w-10 h-10 object-contain" />
+              <span className="text-2xl font-black tracking-tighter uppercase">MaskPay</span>
+            </div>
+            <h1 className="text-3xl font-black tracking-tight uppercase">Nova senha</h1>
+            <p className="mt-2 text-sm text-muted-foreground font-medium">
+              Defina uma senha segura para acessar a plataforma.
+            </p>
+          </div>
+          <Card className="border-white/5 bg-card/40 backdrop-blur-2xl shadow-2xl rounded-[2rem] overflow-hidden">
+            <CardContent className="p-6 md:p-8 space-y-5">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">
+                  Nova senha
+                </Label>
+                <div className="relative">
+                  <Input
+                    type={showRecoveryPw ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={recoveryPw}
+                    onChange={(e) => setRecoveryPw(e.target.value)}
+                    className="bg-white/5 h-14 rounded-xl border-white/5 focus:border-primary/50 px-5 pr-12"
+                    autoFocus
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRecoveryPw(!showRecoveryPw)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/50"
+                  >
+                    {showRecoveryPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">
+                  Confirmar senha
+                </Label>
+                <Input
+                  type={showRecoveryPw ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={recoveryPw2}
+                  onChange={(e) => setRecoveryPw2(e.target.value)}
+                  className="bg-white/5 h-14 rounded-xl border-white/5 focus:border-primary/50 px-5"
+                  autoComplete="new-password"
+                />
+              </div>
+              <Button
+                type="button"
+                disabled={recoverySaving || recoveryPw.length < 6 || recoveryPw2.length < 6}
+                onClick={async () => {
+                  if (recoveryPw.length < 6) {
+                    toast.error('A senha deve ter no mínimo 6 caracteres.');
+                    return;
+                  }
+                  if (recoveryPw !== recoveryPw2) {
+                    toast.error('As senhas não coincidem.');
+                    return;
+                  }
+                  setRecoverySaving(true);
+                  try {
+                    const { error } = await supabase.auth.updateUser({ password: recoveryPw });
+                    if (error) throw error;
+                    try {
+                      sessionStorage.removeItem('maskpay-password-recovery');
+                    } catch {}
+                    try {
+                      await supabase.auth.signOut({ scope: 'local' });
+                    } catch {}
+                    try {
+                      clearAuthStorage();
+                    } catch {}
+                    toast.success('Senha alterada! Faça login com a nova senha.');
+                    setRecoveryActive(false);
+                    navigate({ to: '/auth', search: { mode: 'login' } });
+                  } catch (err: any) {
+                    toast.error(err?.message || 'Erro ao atualizar a senha.');
+                  } finally {
+                    setRecoverySaving(false);
+                  }
+                }}
+                className="w-full h-14 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-xs disabled:opacity-50"
+              >
+                {recoverySaving ? <Loader2 className="animate-spin" /> : 'Salvar nova senha'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex w-full bg-background font-sans text-foreground overflow-x-hidden">
