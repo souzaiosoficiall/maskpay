@@ -6,6 +6,7 @@ import { NotificationManager } from './NotificationManager';
 import { PwaPrompt } from './PwaPrompt';
 import { PushNotificationManager } from './PushNotificationManager';
 import { useSessionReady } from '@/hooks/useSessionReady';
+import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard,
@@ -34,6 +35,7 @@ import maskPlatformAsset from '@/lib/mask-asset';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function DashboardLayout() {
+  const { isLight } = useTheme();
   const [isTransferMenuOpen, setIsTransferMenuOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
@@ -98,10 +100,15 @@ export default function DashboardLayout() {
 
   /** Desktop sidebar (kept for large screens) */
   const DesktopNav = () => (
-    <aside className="hidden lg:flex w-[248px] flex-col border-r border-white/[0.06] bg-[#080b0f] shrink-0">
-      <div className="flex h-16 items-center gap-3 border-b border-white/5 px-6">
+    <aside className={cn(
+      "hidden lg:flex w-[248px] flex-col border-r shrink-0 transition-colors",
+      isLight
+        ? "border-black/10 bg-zinc-50 text-zinc-900"
+        : "border-white/[0.06] bg-[#080b0f]"
+    )}>
+      <div className={cn("flex h-16 items-center gap-3 border-b px-6", isLight ? "border-black/10" : "border-white/5")}>
         <img src={maskPlatformAsset.url} alt="" className="h-8 w-8 object-contain" />
-        <span className="text-base font-semibold tracking-tight text-white">MaskPay</span>
+        <span className={cn("text-base font-semibold tracking-tight", isLight ? "text-zinc-900" : "text-white")}>MaskPay</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3 custom-scrollbar">
         <Link
@@ -109,8 +116,8 @@ export default function DashboardLayout() {
           className={cn(
             'flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
             isActive('/dashboard')
-              ? 'border border-white/10 bg-white/5 text-white'
-              : 'text-muted-foreground hover:bg-white/5 hover:text-white',
+              ? (isLight ? 'border border-black/10 bg-black/[0.04] text-zinc-900' : 'border border-white/10 bg-white/5 text-white')
+              : (isLight ? 'text-zinc-500 hover:bg-black/[0.04] hover:text-zinc-900' : 'text-muted-foreground hover:bg-white/5 hover:text-white'),
           )}
         >
           <LayoutDashboard className="h-5 w-5" />
@@ -121,7 +128,10 @@ export default function DashboardLayout() {
           type="button"
           onClick={() => canAccess && setIsTransferMenuOpen(!isTransferMenuOpen)}
           className={cn(
-            'flex w-full items-center justify-between rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest text-muted-foreground transition-all hover:bg-white/5 hover:text-white',
+            'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
+            isLight
+              ? 'text-zinc-500 hover:bg-black/[0.04] hover:text-zinc-900'
+              : 'text-muted-foreground hover:bg-white/5 hover:text-white',
             !canAccess && 'opacity-50',
           )}
         >
@@ -145,7 +155,10 @@ export default function DashboardLayout() {
                 key={item.to}
                 to={item.to as any}
                 className={cn(
-                  'block rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 hover:text-white',
+                  'block rounded-lg px-3 py-2 text-[12px] font-medium',
+                  isLight
+                    ? 'text-zinc-500 hover:text-zinc-900'
+                    : 'text-muted-foreground/70 hover:text-white',
                   !canAccess && 'pointer-events-none opacity-50',
                 )}
               >
@@ -169,8 +182,8 @@ export default function DashboardLayout() {
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
               isActive(item.to)
-                ? 'border border-white/10 bg-white/5 text-white'
-                : 'text-muted-foreground hover:bg-white/5 hover:text-white',
+                ? (isLight ? 'border border-black/10 bg-black/[0.04] text-zinc-900' : 'border border-white/10 bg-white/5 text-white')
+                : (isLight ? 'text-zinc-500 hover:bg-black/[0.04] hover:text-zinc-900' : 'text-muted-foreground hover:bg-white/5 hover:text-white'),
               item.to !== '/docs' && item.to !== '/support' && !canAccess && 'pointer-events-none opacity-50',
             )}
           >
@@ -182,7 +195,7 @@ export default function DashboardLayout() {
           </Link>
         ))}
       </nav>
-      <div className="border-t border-white/5 p-4">
+      <div className={cn("border-t p-4", isLight ? "border-black/10" : "border-white/5")}>
         <Button
           variant="ghost"
           className="w-full justify-start rounded-2xl text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
@@ -223,7 +236,7 @@ export default function DashboardLayout() {
         </header>
 
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 lg:px-6 lg:pt-6"
+          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-5 lg:px-3 lg:pt-4"
         >
           <PwaPrompt />
           <PushNotificationManager />

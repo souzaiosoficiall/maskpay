@@ -472,7 +472,7 @@ function DashboardPage() {
   });
 
   const desktop = (
-    <div className="relative z-10 hidden w-full font-sans lg:block">
+    <div className="relative z-10 hidden w-full max-w-none font-sans lg:block">
       {/* soft ambient glow */}
       <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-white/[0.03] blur-3xl" />
       <div className="pointer-events-none absolute -right-16 top-40 h-72 w-72 rounded-full bg-emerald-500/[0.04] blur-3xl" />
@@ -481,15 +481,12 @@ function DashboardPage() {
         {/* Title row */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="mb-1 flex items-center gap-2">
-              <span className="text-[13px] font-medium text-muted-foreground">Dashboard</span>
-              <span className="inline-flex h-5 items-center rounded-full bg-emerald-500/15 px-2 text-[10px] font-semibold text-emerald-400">
-                ao vivo
-              </span>
-            </div>
-            <h1 className="text-3xl font-semibold tracking-tight text-white">Overview</h1>
+            <p className="mb-1 text-[13px] font-medium text-muted-foreground">
+              Dashboard de usuário
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight text-white">MaskPay</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {greeting}, {fullName} — resumo da sua conta MaskPay
+              {greeting}, {fullName} — resumo da sua conta
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -547,18 +544,13 @@ function DashboardPage() {
             <p className="mt-4 text-[1.75rem] font-semibold tracking-tight text-white tabular-nums">
               {hideValues ? '••••••' : balanceStr}
             </p>
-            <div className="mt-3 flex items-end justify-between gap-3">
-              <p className="text-xs font-medium text-emerald-400/90">
-                {hideValues
-                  ? '••••'
-                  : `${(txStats?.totalFees ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em taxas`}
-              </p>
-              {sparkPath && (
+            {sparkPath && (
+              <div className="mt-3 flex justify-end">
                 <svg width="120" height="36" className="opacity-90">
                   <path d={sparkPath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
@@ -620,33 +612,11 @@ function DashboardPage() {
         <div className="grid grid-cols-12 gap-4">
           <div className="relative col-span-12 overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-transparent p-5 xl:col-span-8">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-white">Fluxo de receita</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Entradas · {todayLabel} · período {activePeriod.toLowerCase()}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {quickActions.map((action) => {
-                  const locked = action.lock && !canAccess;
-                  return (
-                    <button
-                      key={action.label}
-                      type="button"
-                      disabled={locked}
-                      onClick={() => !locked && navigate({ to: action.to as any })}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/[0.06]',
-                        locked && 'opacity-40',
-                      )}
-                    >
-                      <action.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                      {action.label}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="mb-4">
+              <h2 className="text-base font-semibold text-white">Fluxo de receita</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Entradas · {todayLabel} · período {activePeriod.toLowerCase()}
+              </p>
             </div>
 
             <div className="h-[280px] w-full">
