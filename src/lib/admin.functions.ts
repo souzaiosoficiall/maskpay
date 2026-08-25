@@ -103,6 +103,47 @@ export const updateKycStatus = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+/** Normalize storage path (strip bucket prefix / full URL if present). */
+function normalizeKycPath(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  let p = raw.trim();
+  if (!p) return null;
+  // Full signed/public URL → extract object path after /kyc-documents/
+  const marker = '/kyc-documents/';
+  const idx = p.indexOf(marker);
+  if (idx !== -1) {
+    p = p.slice(idx + marker.length).split('?')[0];
+  }
+  // "kyc-documents/user/file.jpg"
+  if (p.startsWith('kyc-documents/')) {
+    p = p.slice('kyc-documents/'.length);
+  }
+  try {
+    p = decodeURIComponent(p);
+  } catch {
+    // keep as-is
+  }
+  return p || null;
+}
+
+async function signKycPath(path: string | null): Promise<string | null> {
+  const objectPath = normalizeKycPath(path);
+  if (!objectPath) return null;
+  try {
+    const { data, error } = await supabaseAdmin.storage
+      .from('kyc-documents')
+      .createSignedUrl(objectPath, 60 * 60); // 1h
+    if (error || !data?.signedUrl) {
+      console.error('[getKycRequestAdmin] sign failed:', objectPath, error?.message);
+      return null;
+    }
+    return data.signedUrl;
+  } catch (e) {
+    console.error('[getKycRequestAdmin] sign exception:', e);
+    return null;
+  }
+}
+
 export const getKycRequestAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.string().uuid().parse(data))
@@ -131,7 +172,8 @@ export const getKycRequestAdmin = createServerFn({ method: "POST" })
       if (!isAdmin) throw new Error("Não autorizado: Acesso restrito.");
     }
 
-    const { data, error } = await supabaseAdmin
+    // Prefer pending; fall back to latest request for this user
+    let { data, error } = await supabaseAdmin
       .from('verification_requests')
       .select('*')
       .eq('user_id', userId)
@@ -140,5 +182,32 @@ export const getKycRequestAdmin = createServerFn({ method: "POST" })
       .limit(1);
 
     if (error) throw new Error(error.message);
-    return data?.[0] ?? null;
+
+    if (!data?.[0]) {
+      const fallback = await supabaseAdmin
+        .from('verification_requests')
+        .select('*')
+        .eq('user_id', userId)
+        .order('submitted_at', { ascending: false })
+        .limit(1);
+      if (fallback.error) throw new Error(fallback.error.message);
+      data = fallback.data;
+    }
+
+    const row = data?.[0] ?? null;
+    if (!row) return null;
+
+    // Sign all three images in parallel on the server (fast + bypasses client storage RLS)
+    const [front_url, back_url, selfie_url] = await Promise.all([
+      signKycPath(row.front_path),
+      signKycPath(row.back_path),
+      signKycPath(row.selfie_path),
+    ]);
+
+    return {
+      ...row,
+      front_url,
+      back_url,
+      selfie_url,
+    };
   });
