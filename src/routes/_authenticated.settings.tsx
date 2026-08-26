@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import maskPlatformAsset from "@/lib/mask-asset";
 import { NotificationDiagnostics } from '@/components/NotificationDiagnostics';
+import { formatAppError } from '@/lib/utils';
 
 export const Route = createFileRoute('/_authenticated/settings')({
   component: SettingsPage,
@@ -75,7 +76,7 @@ function SettingsPage() {
       setAccessForm({ current: '', new: '', confirm: '' });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Erro ao alterar senha de acesso.');
+      toast.error(formatAppError(err, 'Erro ao alterar senha de acesso.'));
     }
   });
 
@@ -93,7 +94,7 @@ function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Erro ao configurar senha de transação.');
+      toast.error(formatAppError(err, 'Erro ao configurar senha de transação.'));
     }
   });
 

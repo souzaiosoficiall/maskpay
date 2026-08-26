@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
 import { User, Building2, ArrowRight, Eye, EyeOff, Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatAppError } from '@/lib/utils';
 import maskPlatformAsset from "@/lib/mask-asset";
 import { AuthVisualPanel } from '@/components/AuthVisualPanel';
 import { useServerFn } from '@tanstack/react-start';
@@ -350,7 +350,7 @@ function AuthPage() {
           setStep(2);
         } catch (err: any) {
           setError(err.message || 'CPF inválido');
-          toast.error(err.message || 'CPF inválido');
+          toast.error(formatAppError(err, 'CPF inválido'));
           return;
         } finally {
           setIsValidatingCPF(false);

@@ -14,6 +14,7 @@ import { getProfile } from '@/lib/settings.functions';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useSessionReady } from '@/hooks/useSessionReady';
+import { formatAppError } from '@/lib/utils';
 
 
 export const Route = createFileRoute('/_authenticated/deposit')({
@@ -98,7 +99,7 @@ function DepositPage() {
       
       toast.success('Pagamento gerado com sucesso!');
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao gerar o pagamento.');
+      toast.error(formatAppError(error, 'Erro ao gerar o pagamento.'));
     } finally {
       setLoading(false);
     }

@@ -131,7 +131,7 @@ export async function notifyPixDepositConfirmed(
         ? `Você recebeu ${formatBRL(amount)} de ${origin}.`
         : `Você recebeu um pagamento via ${origin}.`;
 
-    return await sendPushToUser(wallet.user_id, {
+    const summary = await sendPushToUser(wallet.user_id, {
       title: "MaskPay | Pagamento recebido",
       body,
       url: "/dashboard",
@@ -143,6 +143,16 @@ export async function notifyPixDepositConfirmed(
         origin,
       },
     });
+    console.log("[push] notifyPixDepositConfirmed result", {
+      userId: wallet.user_id,
+      walletId,
+      amount,
+      sent: summary?.sent,
+      failed: summary?.failed,
+      removed: summary?.removed,
+      errors: summary?.errors?.slice?.(0, 3),
+    });
+    return summary;
   } catch (err) {
     console.error("[push] Unexpected error in notifyPixDepositConfirmed:", err);
     return null;

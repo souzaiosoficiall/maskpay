@@ -32,7 +32,7 @@ import { useSessionReady } from '@/hooks/useSessionReady';
 import { getPlatformFees, payPixQrCode, resolvePixDynamic } from '@/lib/payments.functions';
 import { getProfile, updateTransactionPassword } from '@/lib/settings.functions';
 import { parsePixEmv, guessPixKeyType, type ParsedPixQr } from '@/lib/pix-emv';
-import { cn } from '@/lib/utils';
+import { cn, formatAppError } from '@/lib/utils';
 
 export const Route = createFileRoute('/_authenticated/pay-qr')({
   component: PayQrPage,

@@ -13,6 +13,7 @@ import { getProfile, updateTransactionPassword } from '@/lib/settings.functions'
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useSessionReady } from '@/hooks/useSessionReady';
+import { formatAppError } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -129,7 +130,7 @@ function WithdrawPage() {
       setTransactionPassword('');
       setShowConfirm(false);
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao processar a retirada.');
+      toast.error(formatAppError(error, 'Não foi possível processar o saque.'));
     } finally {
       setLoading(false);
     }

@@ -74,3 +74,65 @@ export function getInitials(name: string | null | undefined): string {
   const lastChar = lastPart[0] || "";
   return (firstChar + lastChar).toUpperCase();
 }
+
+
+/**
+ * Turns Zod / server / network errors into a short PT-BR message for toasts.
+ * Never shows raw JSON arrays to the user.
+ */
+export function formatAppError(
+  error: unknown,
+  fallback = "Algo deu errado. Tente novamente.",
+): string {
+  if (error == null) return fallback;
+
+  const tryParseZodMessages = (raw: string): string | null => {
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null;
+    try {
+      const parsed = JSON.parse(trimmed);
+      const list = Array.isArray(parsed) ? parsed : parsed?.issues || parsed?.errors || [parsed];
+      const messages = (list as any[])
+        .map((i) => i?.message || i?.msg || i?.error)
+        .filter((m) => typeof m === "string" && m.length > 0);
+      if (messages.length) return messages[0];
+    } catch {
+      /* not JSON */
+    }
+    return null;
+  };
+
+  if (typeof error === "string") {
+    return tryParseZodMessages(error) || error || fallback;
+  }
+
+  const anyErr = error as any;
+
+  // TanStack / server fn shapes
+  const candidates: unknown[] = [
+    anyErr?.data,
+    anyErr?.message,
+    anyErr?.error,
+    anyErr?.cause?.message,
+    anyErr?.data?.message,
+    anyErr?.data?.error,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) {
+      const zod = tryParseZodMessages(c);
+      if (zod) return zod;
+      // Avoid dumping long stack traces
+      if (c.length < 280 && !c.includes(" at ")) return c;
+    }
+    if (Array.isArray(c) && c[0]?.message) return String(c[0].message);
+    if (c && typeof c === "object" && (c as any).message) {
+      const m = String((c as any).message);
+      const zod = tryParseZodMessages(m);
+      if (zod) return zod;
+      if (m.length < 280) return m;
+    }
+  }
+
+  return fallback;
+}

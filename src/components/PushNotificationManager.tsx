@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,15 +7,11 @@ import { markPushPromptDismissed, wasPushPromptRecentlyDismissed } from '@/lib/p
 import { useSessionReady } from '@/hooks/useSessionReady';
 
 /**
- * Mounted once inside the authenticated shell. Silently runs the full
- * verification flow (SW active? subscription valid? saved on backend?) on
- * every app open, and only surfaces UI when there's something the user can
- * actually act on: granting notification permission.
- *
- * Every other outcome (not installed as PWA, unsupported device, denied
- * permission, SW/backend failures) is intentionally NOT nagged about here —
- * it's surfaced instead in Configurações › Notificações (NotificationDiagnostics),
- * so we never spam the user but the real state is always inspectable.
+ * Mounted once inside the authenticated shell.
+ * - Silently verifies SW + Push Subscription + backend save on every open.
+ * - If permission is already granted, re-syncs subscription without requiring
+ *   the user to open Configurações › Notificações.
+ * - Banner only when permission is still "default".
  */
 export function PushNotificationManager() {
   const sessionReady = useSessionReady();
@@ -23,7 +19,16 @@ export function PushNotificationManager() {
   const [dismissed, setDismissed] = useState(() => wasPushPromptRecentlyDismissed());
   const [activating, setActivating] = useState(false);
 
-  const showBanner = push.state === 'permission_default' && push.isStandalone && !dismissed;
+  // Permission already granted → ensure subscription is saved (no need to "test" in settings)
+  useEffect(() => {
+    if (!sessionReady) return;
+    if (push.permission !== 'granted') return;
+    if (push.isFullyActive) return;
+    void push.refresh();
+  }, [sessionReady, push.permission, push.isFullyActive, push.state, push.refresh]);
+
+  // Show banner on PWA and on regular HTTPS browser (Chrome/Edge support web push in tabs)
+  const showBanner = push.state === 'permission_default' && !dismissed;
 
   const handleActivate = async () => {
     setActivating(true);

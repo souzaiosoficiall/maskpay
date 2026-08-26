@@ -14,6 +14,7 @@ import { getProfile } from '@/lib/settings.functions';
 import { findRecipientByEmail, executeInternalTransfer } from '@/lib/transfer.functions';
 import { motion, AnimatePresence } from 'framer-motion';
 import maskPlatformAsset from "@/lib/mask-asset";
+import { formatAppError } from '@/lib/utils';
 
 export const Route = createFileRoute('/_authenticated/transfer')({
   component: TransferPage,
@@ -65,7 +66,7 @@ function TransferPage() {
       setRecipient(result);
       setStep(2);
     } catch (error: any) {
-      toast.error(error.message || 'Usuário não encontrado.');
+      toast.error(formatAppError(error, 'Usuário não encontrado.'));
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ function TransferPage() {
       setStep(3);
       toast.success('Transferência realizada com sucesso!');
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao realizar transferência.');
+      toast.error(formatAppError(error, 'Erro ao realizar transferência.'));
     } finally {
       setLoading(false);
     }
@@ -180,7 +181,7 @@ function TransferPage() {
                   <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 overflow-hidden p-2 group">
-                        <img src={maskPlatformAsset.url} alt="Usuário" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
+                        <img src={maskPlatformAsset.url} alt="User" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
                       </div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Recebedor</p>
