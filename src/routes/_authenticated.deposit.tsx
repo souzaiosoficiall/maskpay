@@ -3,11 +3,11 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Wallet, ArrowRight, Loader2, Copy, CheckCircle2, QrCode } from 'lucide-react';
 import { useServerFn } from '@tanstack/react-start';
-import { generatePixDeposit, getPlatformFees } from '@/lib/payments.functions';
+import { generatePixDeposit, getPlatformFees, syncPendingDeposit } from '@/lib/payments.functions';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProfile } from '@/lib/settings.functions';
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/_authenticated/deposit')({
 function DepositPage() {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  const [pixData, setPixData] = useState<{ qrCode: string; copyPaste: string; fee: number; net: number } | null>(null);
+  const [pixData, setPixData] = useState<{ qrCode: string; copyPaste: string; fee: number; net: number; transactionId?: string } | null>(null);
   const sessionReady = useSessionReady();
   const fetchProfile = useServerFn(getProfile);
   const fetchFees = useServerFn(getPlatformFees);
@@ -49,6 +49,7 @@ function DepositPage() {
   });
 
   const depositFn = useServerFn(generatePixDeposit);
+  const pollSync = useServerFn(syncPendingDeposit);
 
   const { data: fees } = useQuery({
     queryKey: ['platform-fees'],
@@ -91,7 +92,8 @@ function DepositPage() {
         qrCode: result.qrCode,
         copyPaste: result.copyPaste,
         fee: result.fee,
-        net: result.net
+        net: result.net,
+        transactionId: result.transactionId,
       });
       
       toast.success('Pagamento gerado com sucesso!');
@@ -108,6 +110,39 @@ function DepositPage() {
       toast.success('Pix copiado!');
     }
   }, [pixData]);
+
+
+  // Fallback: if webhook fails, poll acquirer and credit when paid
+  useEffect(() => {
+    if (!pixData?.transactionId || !sessionReady) return;
+    const syncFn = syncPendingDeposit; // bound below via useServerFn
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const res = await pollSync({ data: { transactionId: pixData.transactionId! } });
+        if (stopped) return;
+        if (res?.status === 'completed' && !res.alreadyProcessed) {
+          toast.success(
+            res.credited
+              ? `Pagamento confirmado! +${Number(res.credited).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} creditados.`
+              : 'Pagamento confirmado!',
+          );
+          setPixData(null);
+        } else if (res?.status === 'completed' && res.alreadyProcessed) {
+          toast.success('Pagamento já estava confirmado.');
+          setPixData(null);
+        }
+      } catch (e) {
+        // silent — webhook may still arrive
+      }
+    };
+    tick();
+    const id = setInterval(tick, 10_000);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [pixData?.transactionId, sessionReady]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 md:space-y-10 pb-12 md:pb-16 font-sans relative z-10">

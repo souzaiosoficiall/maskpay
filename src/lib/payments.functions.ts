@@ -134,7 +134,9 @@ export const generatePixDeposit = createServerFn({ method: "POST" })
       const providerId = evoData?.id || evoData?.transactionId || evoData?.transaction_id || null;
       const { emv, qrImageBase64 } = extractPixCodes(evoData);
 
-      await (supabase.from("transactions") as any)
+      // Use service role so provider_id is always saved (RLS can block user client)
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await (supabaseAdmin.from("transactions") as any)
         .update({
           provider_id: providerId,
           metadata: {
@@ -618,5 +620,142 @@ export const resolvePixDynamic = createServerFn({ method: "POST" })
       pixKey,
       source: amount || pixKey ? ("location" as const) : ("none" as const),
       locationUrl: url,
+    };
+  });
+
+/**
+ * Reconciles a pending deposit with the acquirer.
+ * Use when webhook did not arrive: polls EvoPay and credits NET if paid.
+ */
+export const syncPendingDeposit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ transactionId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: wallet } = await supabase
+      .from("wallets")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!wallet?.id) throw new Error("Carteira não encontrada.");
+
+    const { data: tx, error: txErr } = await (supabaseAdmin.from("transactions") as any)
+      .select("id, status, wallet_id, amount, net_amount, fee_amount, type, provider_id, metadata")
+      .eq("id", data.transactionId)
+      .eq("wallet_id", wallet.id)
+      .maybeSingle();
+
+    if (txErr) throw new Error(txErr.message);
+    if (!tx) throw new Error("Transação não encontrada.");
+    if (tx.type !== "deposit") throw new Error("Apenas depósitos podem ser sincronizados.");
+    if (tx.status === "completed" || tx.status === "paid") {
+      return { status: "completed", alreadyProcessed: true, credited: 0 };
+    }
+    if (tx.status !== "pending") {
+      return { status: tx.status, alreadyProcessed: true, credited: 0 };
+    }
+
+    const paymentRoute = await getUserPaymentRoute(supabase, userId);
+    const providerId = tx.provider_id;
+    if (!providerId) {
+      throw new Error(
+        "Depósito sem ID da adquirente. Gere um novo PIX ou contate o suporte.",
+      );
+    }
+
+    // Try common EvoPay status endpoints
+    let evoStatus: any = null;
+    const attempts = [
+      `/pix/${providerId}`,
+      `/pix/?id=${encodeURIComponent(providerId)}`,
+      `/transactions/${providerId}`,
+    ];
+    for (const path of attempts) {
+      try {
+        evoStatus = await callEvoPay(path, { method: "GET", route: paymentRoute });
+        if (evoStatus) break;
+      } catch (e: any) {
+        console.warn("[syncPendingDeposit] status attempt failed", path, e?.message);
+      }
+    }
+
+    if (!evoStatus) {
+      throw new Error(
+        "Não foi possível consultar o status na adquirente. Tente novamente em instantes.",
+      );
+    }
+
+    const statusRaw = String(
+      evoStatus.status ||
+        evoStatus.payment_status ||
+        evoStatus.paymentStatus ||
+        evoStatus.state ||
+        evoStatus?.data?.status ||
+        "",
+    ).toLowerCase();
+
+    const paid = [
+      "paid",
+      "completed",
+      "success",
+      "approved",
+      "confirmed",
+      "liquidated",
+      "received",
+      "settled",
+      "done",
+      "credited",
+    ].includes(statusRaw);
+
+    if (!paid) {
+      return {
+        status: statusRaw || "pending",
+        alreadyProcessed: false,
+        credited: 0,
+        message: "Pagamento ainda não confirmado na adquirente.",
+      };
+    }
+
+    // Credit net (idempotent: only if still pending)
+    const { data: locked } = await (supabaseAdmin.from("transactions") as any)
+      .update({ status: "completed", external_status: statusRaw })
+      .eq("id", tx.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+
+    if (!locked) {
+      return { status: "completed", alreadyProcessed: true, credited: 0 };
+    }
+
+    const credit =
+      Number(tx.net_amount) > 0
+        ? Number(tx.net_amount)
+        : Math.max(0, Number(tx.amount || 0) - Number(tx.fee_amount || 0));
+
+    await supabaseAdmin.rpc("adjust_wallet_balance", {
+      p_wallet_id: tx.wallet_id,
+      p_amount: credit,
+    });
+
+    try {
+      const orderId = (tx.metadata || {}).checkout_order_id;
+      if (orderId) {
+        await (supabaseAdmin.from("checkout_orders") as any)
+          .update({ status: "paid" })
+          .eq("id", orderId);
+      }
+    } catch {}
+
+    return {
+      status: "completed",
+      alreadyProcessed: false,
+      credited: credit,
+      message: "Pagamento confirmado e saldo creditado.",
     };
   });
