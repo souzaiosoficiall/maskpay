@@ -5,7 +5,7 @@ import { getProfile, type ProfileWithRole } from '@/lib/settings.functions';
 import { getTickets } from '@/lib/support.functions';
 import { getAllUsers } from '@/lib/admin-system.functions';
 
-import { useSessionReady } from '@/hooks/useSessionReady';
+import { useAdminSessionReady } from '@/hooks/useAdminSessionReady';
 import { getInitials, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { adminSupabase as supabase } from '@/integrations/supabase/admin-client';
@@ -151,7 +151,7 @@ export default function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const sessionReady = useSessionReady();
+  const sessionReady = useAdminSessionReady();
   const fetchProfile = useServerFn(getProfile);
   const fetchTickets = useServerFn(getTickets);
   const fetchUsers = useServerFn(getAllUsers);
@@ -220,14 +220,6 @@ export default function AdminLayout() {
       const loginAt = typeof window !== 'undefined' ? localStorage.getItem('maskpay_admin_login_at') : null;
       const now = Date.now();
       
-      const isFreshLogin = loginAt && (now - parseInt(loginAt)) < 5000;
-      
-      if (!isFreshLogin) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } else {
-        console.log("Login fresco detectado, ignorando delay de sincronização");
-      }
-
       console.log("AdminLayout: Buscando sessão Supabase...");
       const { data: { session } } = await supabase.auth.getSession();
       const userEmail = session?.user?.email?.toLowerCase().trim();

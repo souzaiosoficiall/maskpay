@@ -24,7 +24,7 @@ import {
 } from '@/lib/admin-system.functions';
 import { getAdminFinancialStats } from '@/lib/admin-financial.functions';
 import { useServerFn } from '@tanstack/react-start';
-import { useSessionReady } from '@/hooks/useSessionReady';
+import { useAdminSessionReady } from '@/hooks/useAdminSessionReady';
 import { cn } from '@/lib/utils';
 import maskPlatformAsset from "@/lib/mask-asset";
 import { toast } from 'sonner';
@@ -49,15 +49,11 @@ function AdminPage() {
   });
 
   useEffect(() => {
-    // Executa a migração de dados apenas uma vez por sessão do navegador
     if (typeof window === 'undefined') return;
     if (sessionStorage.getItem('admin_migration_done')) return;
     sessionStorage.setItem('admin_migration_done', '1');
     runMigration();
   }, []);
-
-
-
 
   const navigate = useNavigate();
   const search = useSearch({ from: '/aylla/' }) as any;
@@ -67,17 +63,15 @@ function AdminPage() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedKycId, setSelectedKycId] = useState<string | null>(null);
   
-  // Sincroniza a aba ativa com a URL para permitir navegação direta do sidebar
   useEffect(() => {
     if (search.tab && search.tab !== activeTab) {
       setActiveTab(search.tab);
     }
   }, [search.tab]);
 
-
-  
   const queryClient = useQueryClient();
-  const sessionReady = useSessionReady();
+  // CRITICAL: sessão isolada do admin (maskpay-admin-auth-session)
+  const sessionReady = useAdminSessionReady();
   
   const fetchUsers = useServerFn(getAllUsers);
   const fetchTickets = useServerFn(getTickets);
@@ -93,47 +87,58 @@ function AdminPage() {
   const doDeleteUser = useServerFn(deleteUser);
   const fetchFinancialStats = useServerFn(getAdminFinancialStats);
 
-  const { data: users = [], isLoading: isLoadingUsers, isError: isUsersError, error: usersError, refetch: refetchUsers } = useQuery({
+  const { data: users = [], isLoading: isLoadingUsers, isFetching: isFetchingUsers, refetch: refetchUsers, isError: isErrorUsers } = useQuery({
     queryKey: ['admin_users'],
-    queryFn: () => fetchUsers({}),
-    retry: 1,
+    queryFn: async () => {
+      try {
+        const result = await fetchUsers({});
+        return Array.isArray(result) ? result : [];
+      } catch (err) {
+        console.error('[admin] getAllUsers failed:', err);
+        throw err;
+      }
+    },
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
     enabled: sessionReady,
-    staleTime: 20_000,
-    refetchOnMount: true,
+    staleTime: 10_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
-  const { data: tickets = [], isLoading: isLoadingTickets, refetch: refetchTickets } = useQuery({
+  const { data: tickets = [], isLoading: isLoadingTickets, isFetching: isFetchingTickets, refetch: refetchTickets, isError: isErrorTickets } = useQuery({
     queryKey: ['admin_tickets'],
-    queryFn: () => fetchTickets({}),
-    retry: 1,
+    queryFn: async () => {
+      try {
+        const result = await fetchTickets({});
+        return Array.isArray(result) ? result : [];
+      } catch (err) {
+        console.error('[admin] getTickets failed:', err);
+        throw err;
+      }
+    },
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
     enabled: sessionReady,
-    staleTime: 20_000,
-    refetchOnMount: true,
+    staleTime: 10_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const { data: logs = [] } = useQuery({
     queryKey: ['admin_logs'],
-    queryFn: () => fetchLogs({}),
+    queryFn: () => fetchLogs({}).catch(() => []),
     enabled: sessionReady && activeTab === 'logs',
-    staleTime: 20_000,
+    staleTime: 15_000,
   });
 
   const { data: financialStats = { totalVolume: 0, balanceInCustody: 0 } } = useQuery({
     queryKey: ['admin_financial_stats'],
     queryFn: () => fetchFinancialStats({}),
     enabled: sessionReady && activeTab === 'dashboard',
-    staleTime: 20_000,
+    staleTime: 15_000,
     refetchOnMount: true,
   });
-
-  useEffect(() => {
-    if (isUsersError && usersError) {
-      toast.error(
-        (usersError as Error)?.message ||
-          'Falha ao carregar usuários. Confira SUPABASE_SERVICE_ROLE_KEY no Vercel.',
-      );
-    }
-  }, [isUsersError, usersError]);
 
   const hasOpenTickets = useMemo(() =>
     tickets.some((t: any) => t.status === 'Aberto'),
@@ -155,7 +160,6 @@ function AdminPage() {
     enabled: sessionReady && !!selectedTicketId,
   });
 
-  // Mutations
   const updateRouteMutation = useMutation({
     mutationFn: (data: { userId: string; route: 'WHITE' | 'BLACK' }) => doUpdateRoute({ data }),
     onSuccess: () => {
@@ -167,7 +171,7 @@ function AdminPage() {
     },
   });
 
-    const updateUserStatusMutation = useMutation({
+  const updateUserStatusMutation = useMutation({
     mutationFn: (data: any) => doUpdateUserStatus({ data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
@@ -228,16 +232,45 @@ function AdminPage() {
     onError: () => toast.error('Erro ao enviar mensagem.')
   });
 
-  if (isLoadingUsers || isLoadingTickets) {
+  if (!sessionReady) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Restaurando sessão admin...</p>
+      </div>
+    );
+  }
+
+  const showInitialLoader = (isLoadingUsers || isLoadingTickets) && users.length === 0 && tickets.length === 0 && !isErrorUsers && !isErrorTickets;
+
+  if (showInitialLoader) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Carregando dados do painel...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
+      {(isErrorUsers || isErrorTickets) && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 flex items-center justify-between gap-4">
+          <p className="text-xs font-bold text-red-400">
+            Algumas informações do painel não carregaram. Verifique a conexão ou tente novamente.
+          </p>
+          <button
+            onClick={() => {
+              refetchUsers();
+              refetchTickets();
+            }}
+            className="shrink-0 text-[10px] font-black uppercase tracking-widest bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1.5 rounded-xl transition-colors"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-center mb-6 md:mb-8 overflow-x-auto pb-2 scrollbar-hide lg:hidden">
         <div className="flex bg-white/5 border border-white/10 p-1 rounded-2xl min-w-max">
           {[
@@ -272,12 +305,16 @@ function AdminPage() {
         </div>
       </div>
 
-
       {activeTab === 'dashboard' && (
         <div className="space-y-8 animate-in fade-in duration-500">
-          <div>
-            <h1 className="text-3xl font-black uppercase tracking-tighter">Painel Administrativo</h1>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Visão geral do sistema e moderação.</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-black uppercase tracking-tighter">Painel Administrativo</h1>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Visão geral do sistema e moderação.</p>
+            </div>
+            {(isFetchingUsers || isFetchingTickets) && (
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0 mt-2" />
+            )}
           </div>
 
           <AdminDashboardStats 
@@ -293,7 +330,7 @@ function AdminPage() {
               <h2 className="text-lg font-black uppercase tracking-tighter mb-6">Últimas Atividades</h2>
               <div className="space-y-4">
                 {users.slice(0, 5).map((u, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
+                  <div key={u.id || i} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center overflow-hidden p-1.5 group">
                         <img src={maskPlatformAsset.url} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
@@ -305,6 +342,9 @@ function AdminPage() {
                     </div>
                   </div>
                 ))}
+                {users.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest py-4 text-center">Nenhum usuário carregado</p>
+                )}
               </div>
             </div>
 
@@ -332,7 +372,7 @@ function AdminPage() {
       {activeTab === 'users' && (
         <UserManagement 
           users={users} 
-          isLoading={isLoadingUsers}
+          isLoading={isLoadingUsers || isFetchingUsers}
           onUpdateStatus={(data) => updateUserStatusMutation.mutate(data)}
           onUpdateBalance={(data) => updateBalanceMutation.mutate(data)}
           onUpdateRoute={(data) => updateRouteMutation.mutateAsync(data)}
@@ -361,7 +401,7 @@ function AdminPage() {
       {activeTab === 'tickets' && (
         <SupportCenter 
           tickets={tickets}
-          isLoading={isLoadingTickets}
+          isLoading={isLoadingTickets || isFetchingTickets}
           messages={messages}
           selectedTicketId={selectedTicketId}
           onSelectTicket={setSelectedTicketId}
